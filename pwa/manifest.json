@@ -1,7 +1,7 @@
 {
-  "name": "HOT情報管理システム",
+  "name": "HOT情報送信アプリ",
   "short_name": "HOT情報",
-  "description": "飲食店営業情報を簡単に収集・管理するためのPWAアプリ",
+  "description": "飲食店営業情報を簡単に送信するためのPWAアプリ",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -23,9 +23,9 @@
   ],
   "shortcuts": [
     {
-      "name": "情報登録",
+      "name": "情報送信",
       "url": "index.html",
-      "description": "新しい情報を登録します"
+      "description": "新しい情報を送信します"
     }
   ]
 } 
