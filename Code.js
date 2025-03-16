@@ -34,9 +34,8 @@ function doGet(e) {
         params.address || ""
       ]);
       
-      // 送信成功画面を返す
-      return HtmlService.createHtmlOutput(
-        `<!DOCTYPE html>
+      // 送信成功画面のHTMLを作成
+      const htmlContent = `<!DOCTYPE html>
          <html>
            <head>
              <meta charset="UTF-8">
@@ -62,12 +61,16 @@ function doGet(e) {
              </div>
              <p><a href="javascript:window.close();">このウィンドウを閉じる</a></p>
            </body>
-         </html>`
-      );
+         </html>`;
+      
+      // HtmlServiceでレスポンス作成（CORS対応）
+      const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      
+      return htmlOutput;
     } catch (error) {
-      // エラー発生時
-      return HtmlService.createHtmlOutput(
-        `<!DOCTYPE html>
+      // エラー発生時のHTML作成
+      const errorContent = `<!DOCTYPE html>
          <html>
            <head>
              <meta charset="UTF-8">
@@ -88,13 +91,54 @@ function doGet(e) {
              </div>
              <p><a href="javascript:window.close();">このウィンドウを閉じる</a></p>
            </body>
-         </html>`
-      );
+         </html>`;
+      
+      // HtmlServiceでレスポンス作成（CORS対応）
+      const htmlOutput = HtmlService.createHtmlOutput(errorContent)
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      
+      return htmlOutput;
     }
   }
   
-  // 通常アクセス時はAPIの情報を表示
-  return HtmlService.createHtmlOutput("HOT情報管理システムのAPIです");
+  // クエリパラメータがresultFormatをJSONに指定した場合はJSON形式で返す（API利用向け）
+  if (e.parameter && e.parameter.resultFormat === 'json') {
+    const output = ContentService.createTextOutput(JSON.stringify({
+      "status": "ok",
+      "message": "HOT情報管理システムのAPIです"
+    }));
+    output.setMimeType(ContentService.MimeType.JSON);
+    
+    // CORS設定用のヘッダー
+    output.setHeader("Access-Control-Allow-Origin", "*");
+    output.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    output.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    
+    return output;
+  }
+  
+  // 通常アクセス時はHTMLでAPIの情報を表示
+  const htmlOutput = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>HOT情報管理システム API</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
+          .api-info { background: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <h1>HOT情報管理システム</h1>
+        <div class="api-info">
+          <p>HOT情報管理システムのAPIです</p>
+        </div>
+      </body>
+    </html>
+  `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  
+  return htmlOutput;
 }
 
 // プリフライトリクエスト（OPTIONS）への対応
