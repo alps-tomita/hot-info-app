@@ -32,12 +32,66 @@
             padding: 10px 15px;
             cursor: pointer;
             font-size: 16px;
+            margin-right: 10px;
         }
         #result {
             margin-top: 20px;
             padding: 10px;
             border: 1px solid #ccc;
+            background-color: #f9f9f9;
+            max-height: 400px;
+            overflow: auto;
+        }
+        /* アラート表示用のスタイル */
+        .alert {
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+        }
+        .alert-success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .alert-danger {
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .alert-info {
+            color: #0c5460;
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            overflow: auto;
+            max-height: 200px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        .tab {
+            padding: 10px 15px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            background-color: #f5f5f5;
+        }
+        .tab.active {
+            background-color: #4285f4;
+            color: white;
+            border-color: #4285f4;
+        }
+        .tab-content {
             display: none;
+        }
+        .tab-content.active {
+            display: block;
         }
     </style>
 </head>
@@ -46,7 +100,7 @@
     
     <div class="form-group">
         <label for="apiUrl">WebアプリのURL:</label>
-        <input type="text" id="apiUrl" value="https://script.google.com/macros/s/AKfycbw4GRd4N6PaILcW4YRcAxj69zELP9GGdt5SHBhtCe1RNp1bprVkZHEGcOJb6umAwjr51A/exec">
+        <input type="text" id="apiUrl" value="https://script.google.com/macros/s/AKfycbzscXqunYFjGbSyRB9hQiPZwjLrD9kmKdyAuhhTEZk_DDtjHCIMq1Em67dwbQ2LSZBm/exec">
     </div>
 
     <div class="form-group">
@@ -79,14 +133,205 @@
         <input type="text" id="imageUrl" value="https://example.com/test.jpg">
     </div>
 
-    <button onclick="sendData()">送信</button>
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('post')">POSTで送信</div>
+        <div class="tab" onclick="switchTab('get')">GETで送信</div>
+        <div class="tab" onclick="switchTab('iframe')">iFrameで送信</div>
+    </div>
+
+    <div id="post-tab" class="tab-content active">
+        <button onclick="sendDataPost()">POSTで送信</button>
+    </div>
+
+    <div id="get-tab" class="tab-content">
+        <button onclick="sendDataGet()">GETで送信</button>
+    </div>
+
+    <div id="iframe-tab" class="tab-content">
+        <button onclick="sendDataIframe()">iFrameで送信</button>
+    </div>
 
     <div id="result"></div>
+    <div id="iframe-container" style="display:none;"></div>
 
     <script>
-        function sendData() {
-            const apiUrl = document.getElementById('apiUrl').value;
+        function switchTab(tabId) {
+            // タブのアクティブ状態を切り替え
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.tab:nth-child(${tabId === 'post' ? 1 : tabId === 'get' ? 2 : 3})`).classList.add('active');
+            
+            // コンテンツの表示を切り替え
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`${tabId}-tab`).classList.add('active');
+        }
+
+        // POST送信メソッド
+        function sendDataPost() {
+            // URLの取得
+            const scriptUrl = document.getElementById('apiUrl').value;
+            
+            // データの取得
             const data = {
+                route: document.getElementById('route').value,
+                latitude: document.getElementById('latitude').value,
+                longitude: document.getElementById('longitude').value,
+                category: document.getElementById('category').value,
+                comment: document.getElementById('comment').value,
+                imageUrl: document.getElementById('imageUrl').value,
+                // デバッグパラメータを追加
+                debug: "true",
+                timestamp: new Date().toISOString(),
+                method: "POST"
+            };
+            
+            // 結果表示欄の取得
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>送信中...</p>';
+            
+            // FormDataオブジェクトを作成
+            const formData = new FormData();
+            Object.entries(data).forEach(([key, value]) => {
+                formData.append(key, value);
+            });
+            
+            console.log('POST送信データ:', data);
+            console.log('POST送信URL:', scriptUrl);
+            
+            // FetchAPIを使用してPOSTリクエスト送信（FormDataを使用）
+            fetch(scriptUrl, {
+                method: 'POST',
+                mode: 'no-cors',  // CORS制限を回避
+                // Content-Typeヘッダーは削除（FormDataを使用する場合は自動設定される）
+                body: formData  // JSONではなくFormDataを使用
+            })
+            .then(() => {
+                // no-corsモードではレスポンスの内容を読み取れない（opaque response）
+                // ただし、リクエスト自体は送信される
+                resultDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <p><strong>リクエストが送信されました！</strong></p>
+                        <p>※注意: no-corsモードを使用しているため、レスポンスの内容は取得できません。</p>
+                        <p>送信したデータ:</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        <p><a href="https://docs.google.com/spreadsheets/d/1Eo_kM5fDs8jHzcDI4vCpx5kCxevbLhJqx48WNPh3p04" target="_blank">
+                            スプレッドシートを確認してください</a>（新しいタブで開きます）</p>
+                    </div>
+                `;
+            })
+            .catch(error => {
+                console.error('POST送信エラー:', error);
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <p><strong>エラーが発生しました:</strong> ${error.message}</p>
+                        <p>CORSエラーの可能性があります。no-corsモードの制限により、エラーが表示されていても実際にはデータが送信されている可能性があります。</p>
+                        <p>送信したデータ:</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        <p><a href="https://docs.google.com/spreadsheets/d/1Eo_kM5fDs8jHzcDI4vCpx5kCxevbLhJqx48WNPh3p04" target="_blank">
+                            スプレッドシートを確認してください</a>（新しいタブで開きます）</p>
+                    </div>
+                `;
+            });
+        }
+
+        // GETメソッドでデータを送信
+        function sendDataGet() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const data = getFormData();
+            
+            // デバッグ用のパラメータを追加
+            data.debug = "true";
+            data.timestamp = new Date().toISOString();
+            data.method = "GET";
+            
+            // GETパラメータを構築
+            const params = new URLSearchParams();
+            Object.entries(data).forEach(([key, value]) => {
+                params.append(key, value);
+            });
+            
+            // 結果表示エリア
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>送信中...</p>';
+            
+            // 新しいウィンドウでGET送信
+            const fullUrl = apiUrl + '?' + params.toString();
+            const newWindow = window.open(fullUrl, '_blank');
+            
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <p><strong>GETリクエストを新しいウィンドウで送信しました</strong></p>
+                    <p>URLのレスポンスを確認してください。</p>
+                    <p><a href="${fullUrl}" target="_blank">送信URL（クリックで開く）</a></p>
+                    <p>送信したデータ:</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                    <p><a href="https://docs.google.com/spreadsheets/d/1Eo_kM5fDs8jHzcDI4vCpx5kCxevbLhJqx48WNPh3p04" target="_blank">
+                        スプレッドシートを確認してください</a>（新しいタブで開きます）</p>
+                </div>
+            `;
+        }
+
+        // iFrameを使った送信方法（CORS回避）
+        function sendDataIframe() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const data = getFormData();
+            
+            // デバッグ用のパラメータを追加
+            data.debug = "true";
+            data.timestamp = new Date().toISOString();
+            data.method = "iframe";
+            
+            // 結果表示エリア
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>送信中...</p>';
+            
+            // iFrameコンテナを取得
+            const iframeContainer = document.getElementById('iframe-container');
+            iframeContainer.innerHTML = '';
+            
+            // フォームを動的に作成
+            const form = document.createElement('form');
+            form.method = 'GET'; // GETメソッドに変更（POSTでのフォーム送信はGASでの処理が難しいため）
+            form.action = apiUrl;
+            form.target = 'response-iframe';
+            form.enctype = 'application/x-www-form-urlencoded';
+            
+            // データをhidden inputとして追加
+            Object.entries(data).forEach(([key, value]) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = value;
+                form.appendChild(input);
+            });
+            
+            // レスポンス用のiFrameを作成
+            const iframe = document.createElement('iframe');
+            iframe.name = 'response-iframe';
+            iframe.style.width = '100%';
+            iframe.style.height = '300px'; // 高さを大きくして見やすく
+            iframe.style.border = '1px solid #ccc';
+            
+            // コンテナに追加
+            iframeContainer.appendChild(iframe);
+            iframeContainer.appendChild(form);
+            iframeContainer.style.display = 'block';
+            
+            // フォーム送信
+            form.submit();
+            
+            resultDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <p><strong>iFrameを使ってフォームを送信しました</strong></p>
+                    <p>下のiFrameにレスポンスが表示されます：</p>
+                    <p>送信したデータ:</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                </div>
+            `;
+        }
+
+        // フォームデータを取得する共通関数
+        function getFormData() {
+            return {
                 route: document.getElementById('route').value,
                 latitude: document.getElementById('latitude').value,
                 longitude: document.getElementById('longitude').value,
@@ -94,31 +339,6 @@
                 comment: document.getElementById('comment').value,
                 imageUrl: document.getElementById('imageUrl').value
             };
-
-            // 結果表示エリアをリセット
-            const resultDiv = document.getElementById('result');
-            resultDiv.style.display = 'block';
-            resultDiv.innerHTML = '送信中...';
-
-            // XHRを使用した送信
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', apiUrl, true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    resultDiv.innerHTML = '<p style="color: green;">送信成功!</p><pre>' + xhr.responseText + '</pre>';
-                    alert('データ送信に成功しました！スプレッドシートを確認してください。');
-                } else {
-                    resultDiv.innerHTML = '<p style="color: red;">エラー: ' + xhr.status + '</p><pre>' + xhr.responseText + '</pre>';
-                }
-            };
-            
-            xhr.onerror = function() {
-                resultDiv.innerHTML = '<p style="color: red;">ネットワークエラーが発生しました</p>';
-            };
-            
-            xhr.send(JSON.stringify(data));
         }
     </script>
 </body>
