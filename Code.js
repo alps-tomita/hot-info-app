@@ -6,217 +6,246 @@
 // スプレッドシートID（重要）
 const SPREADSHEET_ID = "1Eo_kM5fDs8jHzcDI4vCpx5kCxevbLhJqx48WNPh3p04";
 
-function doGet(e) {
-  // パラメータがある場合はデータ追加処理
-  if (e.parameter && Object.keys(e.parameter).length > 0) {
-    try {
-      // データシート取得（IDで直接指定）
-      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      const sheet = ss.getSheetByName("データ受信用");
-      
-      // シートが見つからない場合
-      if (!sheet) {
-        throw new Error("「データ受信用」シートが見つかりません。シート名を確認してください。");
-      }
-      
-      // GETパラメータ取得
-      const params = e.parameter;
-      
-      // データ追加
-      sheet.appendRow([
-        new Date(),
-        params.route || "",
-        params.latitude || "",
-        params.longitude || "",
-        params.category || "",
-        params.comment || "",
-        params.imageUrl || "",
-        params.address || ""
-      ]);
-      
-      // 送信成功画面のHTMLを作成
-      const htmlContent = `<!DOCTYPE html>
-         <html>
-           <head>
-             <meta charset="UTF-8">
-             <title>HOT情報管理システム - 送信完了</title>
-             <style>
-               body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
-               .success { color: green; font-size: 24px; margin: 20px 0; }
-               .details { background: #f5f5f5; padding: 20px; border-radius: 5px; text-align: left; margin: 20px 0; }
-             </style>
-           </head>
-           <body>
-             <h1>HOT情報管理システム</h1>
-             <div class="success">データ送信に成功しました！</div>
-             <div class="details">
-               <p>送信情報:</p>
-               <ul>
-                 <li>ルート名: ${params.route || "未設定"}</li>
-                 <li>緯度: ${params.latitude || "未設定"}</li>
-                 <li>経度: ${params.longitude || "未設定"}</li>
-                 <li>カテゴリ: ${params.category || "未設定"}</li>
-                 <li>コメント: ${params.comment || "未設定"}</li>
-               </ul>
-             </div>
-             <p><a href="javascript:window.close();">このウィンドウを閉じる</a></p>
-           </body>
-         </html>`;
-      
-      // HtmlServiceでレスポンス作成（CORS対応）
-      const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-      
-      return htmlOutput;
-    } catch (error) {
-      // エラー発生時のHTML作成
-      const errorContent = `<!DOCTYPE html>
-         <html>
-           <head>
-             <meta charset="UTF-8">
-             <title>HOT情報管理システム - エラー</title>
-             <style>
-               body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
-               .error { color: red; font-size: 24px; margin: 20px 0; }
-               .details { background: #f5f5f5; padding: 20px; border-radius: 5px; text-align: left; margin: 20px 0; }
-             </style>
-           </head>
-           <body>
-             <h1>HOT情報管理システム</h1>
-             <div class="error">エラーが発生しました</div>
-             <p>${error.toString()}</p>
-             <div class="details">
-               <p>エラーの詳細情報:</p>
-               <pre>${error.stack || "詳細情報なし"}</pre>
-             </div>
-             <p><a href="javascript:window.close();">このウィンドウを閉じる</a></p>
-           </body>
-         </html>`;
-      
-      // HtmlServiceでレスポンス作成（CORS対応）
-      const htmlOutput = HtmlService.createHtmlOutput(errorContent)
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-      
-      return htmlOutput;
+// スプレッドシートアクセスの共通関数（エラーハンドリング強化）
+function getOrCreateSheet(spreadsheetId, sheetName, headers) {
+  try {
+    // スプレッドシートを開く
+    const ss = SpreadsheetApp.openById(spreadsheetId);
+    if (!ss) {
+      throw new Error(`スプレッドシートが見つかりません: ${spreadsheetId}`);
     }
-  }
-  
-  // クエリパラメータがresultFormatをJSONに指定した場合はJSON形式で返す（API利用向け）
-  if (e.parameter && e.parameter.resultFormat === 'json') {
-    const output = ContentService.createTextOutput(JSON.stringify({
-      "status": "ok",
-      "message": "HOT情報管理システムのAPIです"
-    }));
-    output.setMimeType(ContentService.MimeType.JSON);
     
-    // CORS設定用のヘッダー
-    output.setHeader("Access-Control-Allow-Origin", "*");
-    output.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    output.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    // シートを取得
+    let sheet = ss.getSheetByName(sheetName);
+    console.log(`シート「${sheetName}」の検索: ${sheet ? '見つかりました' : '見つかりません'}`);
     
-    return output;
-  }
-  
-  // 通常アクセス時はHTMLでAPIの情報を表示
-  const htmlOutput = HtmlService.createHtmlOutput(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>HOT情報管理システム API</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
-          .api-info { background: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0; }
-        </style>
-      </head>
-      <body>
-        <h1>HOT情報管理システム</h1>
-        <div class="api-info">
-          <p>HOT情報管理システムのAPIです</p>
-        </div>
-      </body>
-    </html>
-  `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  
-  return htmlOutput;
-}
-
-// プリフライトリクエスト（OPTIONS）への対応
-function doOptions(e) {
-  var lock = LockService.getScriptLock();
-  lock.tryLock(30000);
-  
-  try {
-    var output = ContentService.createTextOutput();
-    output.setMimeType(ContentService.MimeType.JSON);
-    output.setContent(JSON.stringify({"status": "success"}));
-    
-    // CORS設定用のヘッダー
-    output.setHeader("Access-Control-Allow-Origin", "*");
-    output.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    output.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    output.setHeader("Access-Control-Max-Age", "86400");
-    
-    return output;
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-function doPost(e) {
-  try {
-    // パラメータ取得
-    const params = JSON.parse(e.postData.contents);
-    
-    // データシート取得（IDで直接指定）
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = ss.getSheetByName("データ受信用");
-    
-    // シートが見つからない場合
+    // シートがなければ作成
     if (!sheet) {
-      throw new Error("「データ受信用」シートが見つかりません。シート名を確認してください。");
+      console.log(`シート「${sheetName}」を新規作成します`);
+      sheet = ss.insertSheet(sheetName);
+      
+      // ヘッダーを設定
+      if (headers && headers.length > 0) {
+        sheet.appendRow(headers);
+        
+        // 列の幅を調整
+        sheet.setColumnWidth(1, 150); // タイムスタンプ
+        headers.forEach((header, index) => {
+          if (header.includes('コメント') || header.includes('URL') || header.includes('データ')) {
+            sheet.setColumnWidth(index + 1, 250);
+          }
+        });
+        
+        // 最初の行を固定
+        sheet.setFrozenRows(1);
+      }
     }
     
-    // データ追加
-    sheet.appendRow([
-      new Date(),
-      params.route || "",
-      params.latitude || "",
-      params.longitude || "",
-      params.category || "",
-      params.comment || "",
-      params.imageUrl || "",
-      params.address || "" // 住所フィールド追加
-    ]);
+    return sheet;
+  } catch (error) {
+    console.error(`シート「${sheetName}」の取得/作成中にエラーが発生しました: ${error.toString()}`);
+    logData("シートアクセスエラー", {
+      error: error.toString(),
+      spreadsheetId: spreadsheetId,
+      sheetName: sheetName
+    });
+    throw error;
+  }
+}
+
+// デバッグ関数：データの内容をログに記録
+function logData(prefix, data) {
+  if (!data) return;
+  
+  console.log(prefix + "：", JSON.stringify(data));
+  
+  // スプレッドシートにもデバッグログを記録
+  try {
+    const logSheet = getOrCreateSheet(
+      SPREADSHEET_ID, 
+      "デバッグログ", 
+      ["タイムスタンプ", "プレフィックス", "データ"]
+    );
     
-    // レスポンス作成
-    var output = ContentService.createTextOutput(JSON.stringify({
-      "result": "success"
-    }));
-    output.setMimeType(ContentService.MimeType.JSON);
+    logSheet.appendRow([new Date(), prefix, JSON.stringify(data)]);
+  } catch (error) {
+    console.error("デバッグログの記録に失敗: " + error.toString());
+  }
+}
+
+/**
+ * GET リクエストを処理する関数 (GAS Web アプリケーションのエントリーポイント)
+ * @param {Object} e - リクエストパラメータ
+ * @return {TextOutput} レスポンス
+ */
+function doGet(e) {
+  try {
+    // リクエストパラメータをログに記録
+    console.log('GETリクエスト:', JSON.stringify(e.parameter));
     
-    // CORS設定用のヘッダー
-    output.setHeader("Access-Control-Allow-Origin", "*");
-    output.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    output.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    // リクエストタイプの取得
+    const requestType = e.parameter.requestType || '';
+    const callback = e.parameter.callback || null; // JSONPコールバック関数名
     
-    return output;
+    let responseData = {};
+    
+    // リクエストタイプに応じた処理
+    if (requestType === 'routes') {
+      // ルート一覧をスプレッドシートから取得
+      try {
+        const routes = getRoutesList();
+        responseData = {
+          status: 'ok',
+          routes: routes
+        };
+      } catch (routeError) {
+        console.error('ルート一覧取得エラー:', routeError);
+        responseData = {
+          status: 'error',
+          message: 'ルート一覧の取得に失敗しました: ' + routeError.message,
+          routes: []
+        };
+      }
+    } else {
+      // フォームデータの保存
+      const route = e.parameter.route || '';
+      const value = e.parameter.value || '';
+      
+      // データを保存
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const sheet = ss.getSheetByName('GETリクエスト') || ss.insertSheet('GETリクエスト');
+      
+      // 現在時刻を取得
+      const now = new Date();
+      
+      // データを1行追加
+      sheet.appendRow([now, route, value]);
+      
+      // レスポンスデータを作成
+      responseData = {
+        status: 'ok',
+        message: 'データを正常に記録しました',
+        details: {
+          route: route,
+          value: value,
+          timestamp: now.toISOString()
+        }
+      };
+    }
+    
+    // レスポンスの生成
+    const jsonString = JSON.stringify(responseData);
+    
+    // JSONPの場合はコールバック関数でラップして返す
+    if (callback) {
+      const content = callback + "(" + jsonString + ");";
+      const output = ContentService.createTextOutput(content);
+      output.setMimeType(ContentService.MimeType.JAVASCRIPT);
+      return output;
+    } else {
+      // 通常のJSONレスポンスを返す
+      const output = ContentService.createTextOutput(jsonString);
+      output.setMimeType(ContentService.MimeType.JSON);
+      return output;
+    }
     
   } catch (error) {
-    // エラーレスポンス作成
-    var output = ContentService.createTextOutput(JSON.stringify({
-      "result": "error",
-      "message": error.toString()
+    // エラーをログに記録
+    console.error('エラー発生:', error.message, error.stack);
+    
+    // エラーレスポンスを生成
+    const errorResponse = {
+      status: 'error',
+      message: error.message
+    };
+    
+    const jsonString = JSON.stringify(errorResponse);
+    
+    // コールバック関数の有無に応じたレスポンス形式を選択
+    const callback = e.parameter.callback || null;
+    if (callback) {
+      const content = callback + "(" + jsonString + ");";
+      const output = ContentService.createTextOutput(content);
+      output.setMimeType(ContentService.MimeType.JAVASCRIPT);
+      return output;
+    } else {
+      const output = ContentService.createTextOutput(jsonString);
+      output.setMimeType(ContentService.MimeType.JSON);
+      return output;
+    }
+  }
+}
+
+/**
+ * HTTP POSTリクエスト処理関数
+ */
+function doPost(e) {
+  var output = ContentService.createTextOutput();
+  output.setMimeType(ContentService.MimeType.JSON);
+  
+  try {
+    var data = {};
+    // POSTデータの処理
+    if (e.postData && e.postData.contents) {
+      try {
+        data = JSON.parse(e.postData.contents);
+      } catch (parseError) {
+        output.setContent(JSON.stringify({
+          status: "error",
+          message: "JSONパースエラー: " + parseError.toString(),
+          timestamp: new Date().toISOString()
+        }));
+        return output;
+      }
+    }
+    
+    // デバッグログを残す
+    console.log("POSTリクエスト受信: " + JSON.stringify(data));
+    
+    // データをスプレッドシートに保存
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = spreadsheet.getSheetByName("提出データ");
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet("提出データ");
+      sheet.appendRow(["タイムスタンプ", "ルート", "緯度", "経度", "住所", "画像URL", "詳細情報", "リクエスト元"]);
+    }
+    
+    // データの保存
+    sheet.appendRow([
+      new Date(),
+      data.route || "",
+      data.latitude || "",
+      data.longitude || "",
+      data.address || "",
+      data.imageUrl || "",
+      data.details || "",
+      e.postData.type || "Unknown"
+    ]);
+    
+    output.setContent(JSON.stringify({
+      status: "ok",
+      message: "データを保存しました",
+      timestamp: new Date().toISOString(),
+      id: sheet.getLastRow() - 1
     }));
-    output.setMimeType(ContentService.MimeType.JSON);
-    
-    // CORS設定用のヘッダー
-    output.setHeader("Access-Control-Allow-Origin", "*");
-    output.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    output.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    
+    return output;
+  } catch (error) {
+    output.setContent(JSON.stringify({
+      status: "error",
+      message: "POSTデータ処理エラー: " + error.toString(),
+      timestamp: new Date().toISOString()
+    }));
     return output;
   }
+}
+
+/**
+ * HTTP OPTIONSリクエスト処理関数（CORS対応用）
+ */
+function doOptions(e) {
+  var output = ContentService.createTextOutput();
+  output.setMimeType(ContentService.MimeType.TEXT);
+  return output;
 }
 
 // グローバル変数（画像保存用フォルダID）
@@ -232,5 +261,133 @@ function saveImageToFolder(base64Image, fileName) {
   } catch (error) {
     console.error("画像保存エラー: " + error.toString());
     return null;
+  }
+}
+
+/**
+ * 診断用：スプレッドシートの構造を確認
+ */
+function checkSpreadsheetStructure() {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = spreadsheet.getSheets();
+  var result = {
+    name: spreadsheet.getName(),
+    url: spreadsheet.getUrl(),
+    sheets: []
+  };
+  
+  for (var i = 0; i < sheets.length; i++) {
+    var sheet = sheets[i];
+    result.sheets.push({
+      name: sheet.getName(),
+      rows: sheet.getLastRow(),
+      cols: sheet.getLastColumn()
+    });
+  }
+  
+  Logger.log(JSON.stringify(result, null, 2));
+  return result;
+}
+
+/**
+ * テスト用：ルート一覧が正しく取得できるかテスト
+ */
+function testGetRoutes() {
+  var mockRequest = {
+    parameter: {
+      requestType: "routes",
+      debug: "true"
+    }
+  };
+  
+  var response = doGet(mockRequest);
+  Logger.log(response.getContent());
+}
+
+/**
+ * ルート一覧をスプレッドシートから取得する関数
+ * @return {Array} ルート名の配列
+ */
+function getRoutesList() {
+  try {
+    // スプレッドシートを開く
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    
+    // ルート一覧のシートを取得または作成
+    let routeSheet = spreadsheet.getSheetByName('ルート一覧');
+    
+    // シートが存在しない場合は作成
+    if (!routeSheet) {
+      console.log('「ルート一覧」シートが見つからないため新規作成します');
+      routeSheet = spreadsheet.insertSheet('ルート一覧');
+      
+      // デフォルトのルート一覧を設定
+      const defaultRoutes = [
+        "東京都心エリア", "東京西部エリア", "東京東部エリア", "東京北部エリア", 
+        "東京南部エリア", "横浜中央エリア", "横浜北部エリア", "横浜南部エリア", 
+        "川崎エリア", "埼玉中央エリア", "埼玉西部エリア", "埼玉東部エリア", 
+        "千葉中央エリア", "千葉西部エリア"
+      ];
+      
+      // ヘッダー行の追加
+      routeSheet.appendRow(['ルート名', '備考']);
+      
+      // デフォルトルートの追加
+      defaultRoutes.forEach(route => {
+        routeSheet.appendRow([route, '']);
+      });
+      
+      // シート装飾の設定
+      routeSheet.getRange('A1:B1').setBackground('#efefef').setFontWeight('bold');
+      routeSheet.setColumnWidth(1, 150);
+      routeSheet.setColumnWidth(2, 250);
+      routeSheet.setFrozenRows(1);
+      
+      console.log('デフォルトルートを設定しました');
+    }
+    
+    // データ範囲の取得（ヘッダー行を除く）
+    const dataRange = routeSheet.getRange(2, 1, routeSheet.getLastRow() - 1, 1);
+    const routeValues = dataRange.getValues();
+    
+    // 配列に変換（空の値を除く）
+    const routes = routeValues
+      .map(row => row[0])
+      .filter(route => route && route.trim().length > 0);
+    
+    console.log(`${routes.length}個のルートを取得しました`);
+    
+    // 空の場合はデフォルト値を返す
+    if (routes.length === 0) {
+      console.log('ルートが登録されていないため、デフォルト値を返します');
+      return [
+        "東京都心エリア", "東京西部エリア", "東京東部エリア", "東京北部エリア", 
+        "東京南部エリア", "横浜中央エリア", "横浜北部エリア", "横浜南部エリア", 
+        "川崎エリア", "埼玉中央エリア", "埼玉西部エリア", "埼玉東部エリア", 
+        "千葉中央エリア", "千葉西部エリア"
+      ];
+    }
+    
+    return routes;
+  } catch (error) {
+    console.error('ルート一覧取得エラー:', error.message, error.stack);
+    
+    // エラーログをスプレッドシートに記録
+    try {
+      logData('ルート一覧取得エラー', {
+        message: error.message,
+        stack: error.stack
+      });
+    } catch (logError) {
+      console.error('エラーログ記録失敗:', logError);
+    }
+    
+    // エラー時はデフォルト値を返す
+    return [
+      "東京都心エリア", "東京西部エリア", "東京東部エリア", "東京北部エリア", 
+      "東京南部エリア", "横浜中央エリア", "横浜北部エリア", "横浜南部エリア", 
+      "川崎エリア", "埼玉中央エリア", "埼玉西部エリア", "埼玉東部エリア", 
+      "千葉中央エリア", "千葉西部エリア"
+    ];
   }
 } 

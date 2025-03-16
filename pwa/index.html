@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#4285f4">
+  <title>HOT情報管理システム</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="images/icon-temp.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="images/icon-temp.svg">
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <h1>HOT情報管理</h1>
+    </header>
+    
+    <!-- オフラインメッセージ -->
+    <div id="offline-message">
+      <p>インターネット接続がありません。情報はオフラインで保存され、接続時に送信されます。</p>
+    </div>
+    
+    <main>
+      <div class="route-selection-container">
+        <h2>ルートを選択してください</h2>
+        
+        <!-- ルートボタンはJavaScriptで動的に生成されます -->
+        <div class="route-buttons-container">
+          <!-- ここにAPIから取得したルートボタンが表示されます -->
+        </div>
+        
+        <!-- カメラボタンは最初から非表示にする（ルート選択後に表示） -->
+        <div class="camera-btn-container" style="display: none;">
+          <button id="start-camera-btn" class="primary-btn">
+            <span class="icon">📷</span>
+            カメラを起動
+          </button>
+        </div>
+      </div>
+      
+      <!-- カメラビュー（初期状態では非表示） -->
+      <div class="camera-container" style="display: none;">
+        <video id="camera-view" autoplay playsinline></video>
+        <canvas id="camera-canvas" style="display: none;"></canvas>
+        
+        <div class="camera-controls">
+          <button id="capture-btn" class="action-btn">
+            <span class="icon">📸</span>
+          </button>
+          <button id="cancel-camera-btn" class="secondary-btn">
+            <span class="icon">✖</span>
+          </button>
+        </div>
+      </div>
+      
+      <!-- 情報入力フォーム（初期状態では非表示） -->
+      <div class="info-form-container" style="display: none;">
+        <div class="preview-container">
+          <img id="preview-image" src="" alt="プレビュー">
+        </div>
+        
+        <form id="info-form">
+          <div class="form-group">
+            <label for="category-select">カテゴリ：</label>
+            <select id="category-select" class="form-control" required>
+              <option value="">-- カテゴリを選択 --</option>
+              <option value="飲食店">飲食店</option>
+              <option value="小売店">小売店</option>
+              <option value="サービス">サービス業</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="comment-input">コメント：</label>
+            <textarea id="comment-input" class="form-control" rows="3" placeholder="例：新しいカフェがオープンしました"></textarea>
+          </div>
+          
+          <div class="location-info">
+            <p id="location-text">位置情報: 取得中...</p>
+          </div>
+          
+          <div class="form-actions">
+            <button type="button" id="submit-btn" class="primary-btn">送信する</button>
+            <button type="button" id="retake-btn" class="secondary-btn">撮り直す</button>
+          </div>
+        </form>
+      </div>
+      
+      <!-- ローディングインジケータ -->
+      <div class="loading-container" style="display: none;">
+        <div class="spinner"></div>
+        <p>処理中...</p>
+      </div>
+      
+      <!-- 完了メッセージ（初期状態では非表示） -->
+      <div class="complete-container" style="display: none;">
+        <div class="complete-icon">✓</div>
+        <h2>送信完了</h2>
+        <p>情報が正常に送信されました</p>
+        <button id="new-report-btn" class="primary-btn">新規登録へ</button>
+      </div>
+    </main>
+    
+    <footer>
+      <p>HOT情報管理システム v1.0</p>
+    </footer>
+  </div>
+  
+  <script src="app.js"></script>
+  <script>
+    // キャッシュクリアのためのバージョン管理
+    const appVersion = '1.0.5';
+    
+    // Service Worker登録
+    if ('serviceWorker' in navigator) {
+      // 新しいバージョンならすべてのService Workerを登録解除
+      if (localStorage.getItem('appVersion') !== appVersion) {
+        console.log('新しいバージョンを検出: ' + appVersion);
+        
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+            console.log('Service Worker登録解除: ', registration);
+          }
+        }).then(function() {
+          // バージョン情報を保存
+          localStorage.setItem('appVersion', appVersion);
+          console.log('新バージョン情報を保存');
+          
+          // Service Worker登録
+          navigator.serviceWorker.register('service-worker.js')
+            .then(reg => console.log('Service Worker登録成功:', reg))
+            .catch(err => console.error('Service Worker登録失敗:', err));
+        });
+      } else {
+        // 同じバージョンなら通常登録
+        navigator.serviceWorker.register('service-worker.js')
+          .then(reg => console.log('Service Worker登録成功:', reg))
+          .catch(err => console.error('Service Worker登録失敗:', err));
+      }
+    }
+  </script>
+</body>
+</html> 

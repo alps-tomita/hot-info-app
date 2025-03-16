@@ -1,0 +1,8 @@
+# PWA関連ファイルを除外
+pwa/**
+gas-project/**
+*.md
+.git/**
+
+# MacOSシステムファイル
+.DS_Store 
