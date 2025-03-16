@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>HOT情報管理システム フォーム送信テスト</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 600px;
+        }
+        h1 {
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>HOT情報管理システム フォーム送信テスト</h1>
+    
+    <p>このフォームは、CORSの問題を回避するためにGETメソッドを使用します。</p>
+    
+    <!-- URLに?を追加して、クエリパラメータとして送信します -->
+    <form action="https://script.google.com/macros/s/AKfycbw4GRd4N6PaILcW4YRcAxj69zELP9GGdt5SHBhtCe1RNp1bprVkZHEGcOJb6umAwjr51A/exec" method="GET" target="_blank">
+        <div class="form-group">
+            <label for="route">ルート名:</label>
+            <input type="text" id="route" name="route" value="テストルート">
+        </div>
+
+        <div class="form-group">
+            <label for="latitude">緯度:</label>
+            <input type="text" id="latitude" name="latitude" value="35.681236">
+        </div>
+
+        <div class="form-group">
+            <label for="longitude">経度:</label>
+            <input type="text" id="longitude" name="longitude" value="139.767125">
+        </div>
+
+        <div class="form-group">
+            <label for="category">カテゴリ:</label>
+            <input type="text" id="category" name="category" value="新規オープン">
+        </div>
+
+        <div class="form-group">
+            <label for="comment">コメント:</label>
+            <textarea id="comment" name="comment">テスト送信です</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="imageUrl">画像URL:</label>
+            <input type="text" id="imageUrl" name="imageUrl" value="https://example.com/test.jpg">
+        </div>
+
+        <button type="submit">送信</button>
+    </form>
+    
+    <p>
+        <small>※ 送信後、新しいタブが開き結果が表示されます。スプレッドシートも確認してください。</small>
+    </p>
+</body>
+</html> 
