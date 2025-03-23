@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('写真なしで送信が選択されました。ルート：', selectedRoute);
     routeSelectionContainer.style.display = 'none';
     infoFormContainer.style.display = 'block';
-    document.getElementById('location-text').style.display = 'none';
+    showLocationStep();
     setupCategoryCards();
   });
 
@@ -131,8 +131,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 位置情報入力から次へボタンのイベントリスナー
-  document.getElementById('next-to-category-btn')?.addEventListener('click', () => {
-    locationDetail = document.getElementById('location-detail').value.trim();
+  document.getElementById('next-to-category-btn').addEventListener('click', () => {
+    const formData = getFormData();
+    if (!formData.latitude || !formData.longitude) {
+      alert('位置情報が取得できていません');
+      return;
+    }
     showCategoryStep();
   });
 
@@ -479,20 +483,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (exifLocation) {
           latitude = exifLocation.latitude;
           longitude = exifLocation.longitude;
-          document.getElementById('location-text').textContent = 
-            `位置情報(EXIF): 緯度 ${latitude.toFixed(6)}, 経度 ${longitude.toFixed(6)}`;
+          document.getElementById('location-coords').textContent = 
+            `緯度: ${latitude.toFixed(6)}, 経度: ${longitude.toFixed(6)}`;
           return;
         }
 
         // EXIF情報が取得できない場合はデバイスの位置情報を取得
         const location = await getLocation();
-        latitude = location.latitude;
-        longitude = location.longitude;
-        document.getElementById('location-text').textContent = 
-          `位置情報(GPS): 緯度 ${latitude.toFixed(6)}, 経度 ${longitude.toFixed(6)}`;
+        if (location) {
+          latitude = location.latitude;
+          longitude = location.longitude;
+          document.getElementById('location-coords').textContent = 
+            `緯度: ${latitude.toFixed(6)}, 経度: ${longitude.toFixed(6)}`;
+        }
       } catch (error) {
         console.error('位置情報の取得に失敗しました:', error);
-        document.getElementById('location-text').textContent = '位置情報: 取得できませんでした';
+        document.getElementById('location-coords').textContent = '位置情報を取得できませんでした';
+        document.getElementById('location-address').placeholder = '住所を入力してください';
         // 位置情報が取得できない場合はnullを設定
         latitude = null;
         longitude = null;
@@ -644,24 +651,51 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * 位置情報を取得する関数
+ * 位置情報を取得して表示する関数
  */
-function getLocation() {
+async function getLocation() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error('お使いのブラウザは位置情報をサポートしていません'));
+      console.log('位置情報がサポートされていません');
       return;
     }
-    
+
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        
+        // 位置情報を表示
+        document.getElementById('location-coords').textContent = 
+          `緯度: ${latitude.toFixed(6)}, 経度: ${longitude.toFixed(6)}`;
+        
+        // 住所を取得して表示
+        try {
+          const response = await fetch(
+            `https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+          
+          if (data.results) {
+            // 市区町村コードを除外し、住所のみを表示
+            const address = data.results.lv01Nm;
+            document.getElementById('location-address').value = address || '住所を入力してください';
+          }
+        } catch (error) {
+          console.error('住所の取得に失敗しました:', error);
+          document.getElementById('location-address').placeholder = '住所を入力してください';
+        }
+        
         resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
+          latitude: latitude,
+          longitude: longitude
         });
       },
       (error) => {
-        reject(error);
+        console.log('位置情報の取得に失敗しました:', error);
+        document.getElementById('location-coords').textContent = '位置情報を取得できませんでした';
+        document.getElementById('location-address').placeholder = '住所を入力してください';
+        resolve(null);
       },
       {
         enableHighAccuracy: true,
@@ -670,6 +704,30 @@ function getLocation() {
       }
     );
   });
+}
+
+// フォームデータを取得する関数
+function getFormData() {
+  const locationCoordsText = document.getElementById('location-coords').textContent;
+  const locationAddress = document.getElementById('location-address').value;
+  const locationDetail = document.getElementById('location-detail').value;
+  
+  let latitude = null;
+  let longitude = null;
+  
+  // 位置情報の解析
+  const coordsMatch = locationCoordsText.match(/緯度: ([\d.-]+), 経度: ([\d.-]+)/);
+  if (coordsMatch) {
+    latitude = parseFloat(coordsMatch[1]);
+    longitude = parseFloat(coordsMatch[2]);
+  }
+  
+  return {
+    latitude,
+    longitude,
+    address: locationAddress,
+    detail: locationDetail
+  };
 }
 
 /**
