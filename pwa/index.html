@@ -9,6 +9,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="images/icon-temp.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="images/icon-temp.svg">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
   <div class="app-container">
@@ -30,7 +31,11 @@
         <div class="camera-btn-container" style="display: none;">
           <button id="start-camera-btn" class="primary-btn">
             <span class="icon">📷</span>
-            カメラを起動
+            写真を撮影して送信
+          </button>
+          <button id="no-photo-btn" class="secondary-btn">
+            <span class="icon">✏️</span>
+            写真なしで送信
           </button>
         </div>
       </div>
@@ -65,43 +70,51 @@
           <div class="category-cards">
             <div class="category-card" data-category="カフェ">
               <span class="category-icon">☕</span>
-              <span class="category-name">カフェ</span>
+              <span>カフェ</span>
             </div>
             <div class="category-card" data-category="バー">
               <span class="category-icon">🍸</span>
-              <span class="category-name">バー</span>
+              <span>バー</span>
             </div>
             <div class="category-card" data-category="居酒屋">
               <span class="category-icon">🍶</span>
-              <span class="category-name">居酒屋</span>
+              <span>居酒屋</span>
             </div>
             <div class="category-card" data-category="和食">
               <span class="category-icon">🍱</span>
-              <span class="category-name">和食</span>
+              <span>和食</span>
             </div>
             <div class="category-card" data-category="洋食">
               <span class="category-icon">🍽️</span>
-              <span class="category-name">洋食</span>
+              <span>洋食</span>
             </div>
             <div class="category-card" data-category="中華">
               <span class="category-icon">🥢</span>
-              <span class="category-name">中華</span>
+              <span>中華</span>
+            </div>
+            <div class="category-card" data-category="寿司">
+              <span class="category-icon">🍣</span>
+              <span>寿司</span>
             </div>
             <div class="category-card" data-category="ラーメン">
               <span class="category-icon">🍜</span>
-              <span class="category-name">ラーメン</span>
+              <span>ラーメン</span>
             </div>
             <div class="category-card" data-category="焼肉">
               <span class="category-icon">🥩</span>
-              <span class="category-name">焼肉</span>
+              <span>焼肉</span>
             </div>
             <div class="category-card" data-category="夜店">
-              <span class="category-icon">🏮</span>
-              <span class="category-name">夜店</span>
+              <span class="category-icon">🍾</span>
+              <span>夜店</span>
             </div>
             <div class="category-card" data-category="その他">
               <span class="category-icon">📌</span>
-              <span class="category-name">その他</span>
+              <span>その他</span>
+            </div>
+            <div class="category-card" data-category="不明">
+              <span class="category-icon">❓</span>
+              <span>不明</span>
             </div>
           </div>
         </div>
