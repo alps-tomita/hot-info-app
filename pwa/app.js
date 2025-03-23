@@ -5,7 +5,7 @@
 
 // グローバル変数
 // ↓↓↓ ここのURLをGASの新しいデプロイメントURLに更新してください ↓↓↓
-const API_URL = 'https://script.google.com/macros/s/AKfycbyP9ssL37CGFbk3RTmCS9I2joOnpNImfKfl0e4c-ubiU4MbRFIwLJA6DEAUKkb1k1ms/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxKnjzsPCdpBwFChTJgWDY9MB8ZYDrmx0PNmKcAVOK0XNjY701AcYPX7JZ0cfLIkauk/exec';
 // ↑↑↑ 新しいデプロイメントURLに更新 ↑↑↑
 let selectedRoute = '';
 let capturedImage = null;
@@ -79,147 +79,76 @@ document.addEventListener('DOMContentLoaded', () => {
   /**
    * ルート一覧を取得する関数
    */
-  function fetchRoutes() {
-    // ローディング表示を追加
-    routeButtonsContainer.innerHTML = '<div class="loading-indicator">ルート一覧を取得中...</div>';
-    
-    // APIからルート一覧を取得するURLを構築
-    const routesURL = `${API_URL}?requestType=routes`;
-    console.log('APIからルート一覧を取得開始:', routesURL);
-    
-    // ブラウザでURLを開くためのリンクをコンソールに表示
-    console.log('APIテスト方法: このURLをブラウザで直接開いてみてください:', routesURL);
-    console.log('---------------------------------------------------');
-    console.log('CORS問題が発生する場合は、以下のURLでGASデプロイメントを新しく作成してください:');
-    console.log('https://script.google.com/home/projects/1Eo_kM5fDs8jHzcDI4vCpx5kCxevbLhJqx48WNPh3p04/deployments');
-    console.log('新しいデプロイを作成後、そのURLをapp.jsのAPI_URL定数に設定してください');
-    console.log('---------------------------------------------------');
-    
-    // 最初にJSONPアプローチを試す
-    console.log('JSONPを使用してAPIにアクセスします');
-    tryJsonpApproach(routesURL);
-    
-    // タイムアウト処理（5秒後にCORSプロキシを使用）
-    setTimeout(() => {
-      if (document.querySelector('.loading-indicator')) {
-        console.log('JSONPがタイムアウトしました。CORSプロキシを使用してアクセスを試みます...');
-        tryCorsProxyApproach(routesURL);
+  async function fetchRoutes() {
+    try {
+      console.log('ルート一覧の取得を開始します');
+      console.log('API URL:', `${API_URL}?requestType=routes`);
+      
+      const response = await fetch(`${API_URL}?requestType=routes`);
+      console.log('APIレスポンス:', response);
+      console.log('レスポンスヘッダー:', Object.fromEntries(response.headers.entries()));
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    }, 5000);
-  }
-  
-  /**
-   * JSONPアプローチを試みる関数
-   */
-  function tryJsonpApproach(url) {
-    console.log('JSONPアプローチを実行します:', url);
-    
-    window.processRoutes = function(data) {
-      console.log('JSONP経由でデータを受信:', data);
+      
+      const text = await response.text();
+      console.log('生のレスポンス:', text);
+      
+      let data;
+      try {
+        data = JSON.parse(text);
+        console.log('パースしたデータ:', data);
+      } catch (e) {
+        console.error('JSONパースエラー:', e);
+        throw new Error('レスポンスのJSONパースに失敗しました');
+      }
+      
+      if (!data) {
+        throw new Error('データが空です');
+      }
+      
+      console.log('データの型:', typeof data);
+      console.log('データのキー:', Object.keys(data));
       
       if (data.status === 'ok' && Array.isArray(data.routes)) {
-        displayRouteButtons(data.routes);
-        console.log('JSONP: ルートボタンの生成完了:', data.routes.length + '個');
-      } else {
-        console.error('JSONP: 不正なデータ形式:', data);
-        showDefaultRoutes('データ形式が不正です');
-      }
-    };
-    
-    try {
-      const script = document.createElement('script');
-      const timestamp = new Date().toISOString();
-      script.src = `${url}&callback=processRoutes&timestamp=${timestamp}`;
-      script.onerror = function() {
-        console.error('JSONPスクリプトのロードに失敗しました');
-        // エラーの場合はフォールバックを手動で呼び出さない（タイムアウトに任せる）
-      };
-      document.body.appendChild(script);
-      
-      console.log('JSONPスクリプトを追加しました:', script.src);
-    } catch (error) {
-      console.error('JSONPリクエスト作成エラー:', error);
-    }
-  }
-  
-  /**
-   * CORSプロキシを使ったアプローチを試みる関数
-   */
-  function tryCorsProxyApproach(url) {
-    // CORSProxyを使用してAPIにアクセス
-    const corsProxyUrl = 'https://corsproxy.io/?';
-    const proxyUrl = corsProxyUrl + encodeURIComponent(url);
-    
-    console.log('CORSプロキシ経由でAPIにアクセス:', proxyUrl);
-    
-    // タイムスタンプを追加してキャッシュを防止
-    const urlWithTimestamp = `${proxyUrl}&timestamp=${new Date().getTime()}`;
-    
-    // fetch APIを使用してデータを取得
-    fetch(urlWithTimestamp)
-      .then(response => {
-        console.log('レスポンスステータス:', response.status);
+        console.log('ルートデータ:', data.routes);
+        const routeButtonsContainer = document.querySelector('.route-buttons-container');
+        routeButtonsContainer.innerHTML = '';
         
-        if (!response.ok) {
-          throw new Error(`サーバーエラー: ${response.status}`);
-        }
-        
-        // レスポンスヘッダーをチェック
-        const contentType = response.headers.get('content-type');
-        console.log('Content-Type:', contentType);
-        
-        if (!contentType || !contentType.includes('application/json')) {
-          console.warn('JSONレスポンスではありません:', contentType);
-        }
-        
-        return response.text();
-      })
-      .then(text => {
-        console.log('受信データ（生テキスト）:', text.substring(0, 100) + '...');
-        
-        // JSONとして解析を試みる
-        try {
-          const data = JSON.parse(text);
-          console.log('JSONデータを正常に解析:', data);
+        data.routes.forEach(route => {
+          console.log('ルート項目:', route, typeof route);
+          const button = document.createElement('button');
+          button.className = 'route-btn';
+          button.textContent = String(route);
+          button.setAttribute('data-route', String(route));
           
-          if (data.status === 'ok' && Array.isArray(data.routes)) {
-            displayRouteButtons(data.routes);
-            console.log('ルートボタンの生成完了:', data.routes.length + '個');
-          } else {
-            console.error('不正なデータ形式:', data);
-            showDefaultRoutes('データ形式が不正です');
-          }
-        } catch (error) {
-          console.error('JSONパースエラー:', error, text);
-          showDefaultRoutes('データの解析に失敗しました');
-        }
-      })
-      .catch(error => {
-        console.error('データ取得エラー:', error);
-        showDefaultRoutes(error.message);
-      });
-  }
-  
-  /**
-   * ルートボタンを表示する共通関数
-   */
-  function displayRouteButtons(routes) {
-    // ルートボタンコンテナを空にする
-    routeButtonsContainer.innerHTML = '';
-    
-    // 取得したルート一覧でボタンを生成
-    routes.forEach(routeName => {
-      const button = document.createElement('button');
-      button.className = 'route-btn';
-      button.setAttribute('data-route', routeName);
-      button.textContent = routeName;
-      
-      // クリックイベントを追加
-      button.addEventListener('click', handleRouteButtonClick);
-      
-      // コンテナに追加
-      routeButtonsContainer.appendChild(button);
-    });
+          button.addEventListener('click', () => {
+            document.querySelectorAll('.route-btn').forEach(btn => {
+              btn.classList.remove('selected');
+            });
+            button.classList.add('selected');
+            selectedRoute = String(route);
+            console.log('選択されたルート:', selectedRoute);
+            
+            // カメラセクションを表示
+            cameraSection.classList.remove('hidden');
+            infoSection.classList.add('hidden');
+            startCamera();
+          });
+          
+          routeButtonsContainer.appendChild(button);
+        });
+        
+        console.log('ルート一覧の表示が完了しました');
+      } else {
+        console.error('ルートデータの形式が不正です:', data);
+        throw new Error('データ形式が不正です');
+      }
+    } catch (error) {
+      console.error('ルート一覧の取得に失敗しました:', error);
+      showDefaultRoutes(error.message);
+    }
   }
   
   /**

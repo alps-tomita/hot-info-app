@@ -4,8 +4,8 @@
  */
 
 // キャッシュ名
-const CACHE_NAME = 'hot-info-cache-v1.0.5';
-const API_CACHE_NAME = 'hot-info-api-cache-v1.0.5';
+const CACHE_NAME = 'hot-info-cache-v1.0.6';
+const API_CACHE_NAME = 'hot-info-api-cache-v1.0.6';
 
 // キャッシュするリソース
 const CACHE_ASSETS = [

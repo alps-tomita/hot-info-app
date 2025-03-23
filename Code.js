@@ -8,8 +8,8 @@ const SPREADSHEET_ID = "1Eo_kM5fDs8jHzcDI4vCpx5kCxevbLhJqx48WNPh3p04";
 
 // スプレッドシートアクセスの共通関数（エラーハンドリング強化）
 function getOrCreateSheet(spreadsheetId, sheetName, headers) {
-  try {
-    // スプレッドシートを開く
+    try {
+      // スプレッドシートを開く
     const ss = SpreadsheetApp.openById(spreadsheetId);
     if (!ss) {
       throw new Error(`スプレッドシートが見つかりません: ${spreadsheetId}`);
@@ -68,7 +68,7 @@ function logData(prefix, data) {
     );
     
     logSheet.appendRow([new Date(), prefix, JSON.stringify(data)]);
-  } catch (error) {
+    } catch (error) {
     console.error("デバッグログの記録に失敗: " + error.toString());
   }
 }
@@ -146,9 +146,9 @@ function doGet(e) {
       // 通常のJSONレスポンスを返す
       const output = ContentService.createTextOutput(jsonString);
       output.setMimeType(ContentService.MimeType.JSON);
-      return output;
-    }
-    
+    return output;
+  }
+  
   } catch (error) {
     // エラーをログに記録
     console.error('エラー発生:', error.message, error.stack);
@@ -347,15 +347,25 @@ function getRoutesList() {
     }
     
     // データ範囲の取得（ヘッダー行を除く）
-    const dataRange = routeSheet.getRange(2, 1, routeSheet.getLastRow() - 1, 1);
+    const lastRow = routeSheet.getLastRow();
+    if (lastRow <= 1) {
+      console.log('データが存在しません');
+      return [];
+    }
+    
+    const dataRange = routeSheet.getRange(2, 1, lastRow - 1, 1);
     const routeValues = dataRange.getValues();
     
     // 配列に変換（空の値を除く）
     const routes = routeValues
-      .map(row => row[0])
+      .map(row => {
+        const value = row[0];
+        // 数値を文字列に変換
+        return value === null || value === undefined ? '' : String(value);
+      })
       .filter(route => route && route.trim().length > 0);
     
-    console.log(`${routes.length}個のルートを取得しました`);
+    console.log(`${routes.length}個のルートを取得しました:`, routes);
     
     // 空の場合はデフォルト値を返す
     if (routes.length === 0) {
