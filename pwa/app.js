@@ -252,11 +252,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('submit-btn')?.addEventListener('click', async () => {
     const comment = document.getElementById('comment-input').value.trim();
     
-    if (!comment) {
-      alert('コメントを入力してください');
-      return;
-    }
-
     // ローディング表示
     const loadingContainer = document.querySelector('.loading-container');
     loadingContainer.style.display = 'flex';
@@ -269,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
         category: selectedCategory,
         material: selectedMaterial,
         progress: selectedProgress,  // 工事進捗状況を追加
-        comment: comment,
+        comment: comment || '', // 空の場合は空文字列を設定
         image: capturedImage,
         locationDetail: locationDetail,
         ...(capturedImage && {
