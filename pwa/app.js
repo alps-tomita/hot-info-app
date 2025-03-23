@@ -395,8 +395,27 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   async function startCamera() {
     try {
+      // カメラ関連の要素をリセット
       videoElement = document.getElementById('camera-view');
       canvasElement = document.getElementById('camera-canvas');
+      const previewContainer = document.querySelector('.preview-container');
+      const captureBtn = document.getElementById('capture-btn');
+      const retakeBtn = document.getElementById('retake-btn');
+      const usePhotoBtn = document.getElementById('use-photo-btn');
+      
+      // 表示状態をリセット
+      previewContainer.style.display = 'none';
+      videoElement.style.display = 'block';
+      captureBtn.style.display = 'inline-block';
+      retakeBtn.style.display = 'none';
+      usePhotoBtn.style.display = 'none';
+      
+      // プレビュー画像をクリア
+      document.getElementById('preview-image').src = '';
+      capturedImage = null;
+
+      const cameraContainer = document.querySelector('.camera-container');
+      const routeSelectionContainer = document.querySelector('.route-selection-container');
       
       cameraContainer.style.display = 'block';
       routeSelectionContainer.style.display = 'none';
@@ -412,13 +431,15 @@ document.addEventListener('DOMContentLoaded', () => {
       
       mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       videoElement.srcObject = mediaStream;
-      await videoElement.play();
+      await videoElement.play();  // ビデオの再生を待つ
       
+      // カメラのイベントリスナーを設定
       setupCameraEventListeners();
       
     } catch (error) {
       console.error('カメラの起動に失敗しました:', error);
-      handleCameraError(error);
+      alert('カメラの起動に失敗しました。設定を確認してください。');
+      showRouteSelection();
     }
   }
 
@@ -427,29 +448,29 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   function setupCameraEventListeners() {
     const captureBtn = document.getElementById('capture-btn');
-    const cancelBtn = document.getElementById('cancel-camera-btn');
+    const retakeBtn = document.getElementById('retake-btn');
+    const usePhotoBtn = document.getElementById('use-photo-btn');
     
     captureBtn.addEventListener('click', capturePhoto);
-    cancelBtn.addEventListener('click', () => {
-      stopCamera();
-      showRouteSelection();
+    
+    retakeBtn.addEventListener('click', () => {
+      // プレビューを非表示にしてカメラを再表示
+      const previewContainer = document.querySelector('.preview-container');
+      
+      previewContainer.style.display = 'none';
+      videoElement.style.display = 'block';
+      captureBtn.style.display = 'inline-block';
+      retakeBtn.style.display = 'none';
+      usePhotoBtn.style.display = 'none';
     });
-  }
-
-  /**
-   * 写真を撮影する関数
-   */
-  async function capturePhoto() {
-    try {
-      canvasElement.width = videoElement.videoWidth;
-      canvasElement.height = videoElement.videoHeight;
-      
-      const context = canvasElement.getContext('2d');
-      context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-      
-      capturedImage = canvasElement.toDataURL('image/jpeg', 0.8);
+    
+    usePhotoBtn.addEventListener('click', async () => {
       stopCamera();
-      showPreview();
+      
+      // 情報入力フォームを表示
+      cameraContainer.style.display = 'none';
+      infoFormContainer.style.display = 'block';
+      showLocationStep();
       
       // 位置情報の取得を試みる
       try {
@@ -476,6 +497,35 @@ document.addEventListener('DOMContentLoaded', () => {
         latitude = null;
         longitude = null;
       }
+    });
+  }
+
+  /**
+   * 写真を撮影する関数
+   */
+  async function capturePhoto() {
+    try {
+      canvasElement.width = videoElement.videoWidth;
+      canvasElement.height = videoElement.videoHeight;
+      
+      const context = canvasElement.getContext('2d');
+      context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+      
+      capturedImage = canvasElement.toDataURL('image/jpeg', 0.8);
+      
+      // プレビュー表示
+      const previewContainer = document.querySelector('.preview-container');
+      const previewImage = document.getElementById('preview-image');
+      const captureBtn = document.getElementById('capture-btn');
+      const retakeBtn = document.getElementById('retake-btn');
+      const usePhotoBtn = document.getElementById('use-photo-btn');
+      
+      previewImage.src = capturedImage;
+      videoElement.style.display = 'none';
+      previewContainer.style.display = 'block';
+      captureBtn.style.display = 'none';
+      retakeBtn.style.display = 'inline-block';
+      usePhotoBtn.style.display = 'inline-block';
       
     } catch (error) {
       console.error('写真の撮影に失敗しました:', error);
@@ -560,9 +610,6 @@ document.addEventListener('DOMContentLoaded', () => {
    * プレビューを表示する関数
    */
   function showPreview() {
-    const previewImage = document.getElementById('preview-image');
-    previewImage.src = capturedImage;
-    
     cameraContainer.style.display = 'none';
     infoFormContainer.style.display = 'block';
     showLocationStep();  // 位置情報入力ステップを表示

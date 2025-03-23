@@ -45,23 +45,25 @@
       <div class="camera-container" style="display: none;">
         <video id="camera-view" autoplay playsinline></video>
         <canvas id="camera-canvas" style="display: none;"></canvas>
+        <div class="preview-container" style="display: none;">
+          <img id="preview-image" src="" alt="プレビュー">
+        </div>
         
         <div class="camera-controls">
           <button id="capture-btn" class="action-btn">
             <span class="icon">📸</span>
           </button>
-          <button id="cancel-camera-btn" class="secondary-btn">
-            <span class="icon">✖</span>
+          <button id="retake-btn" class="secondary-btn" style="display: none;">
+            <span class="icon">🔄</span>
+          </button>
+          <button id="use-photo-btn" class="primary-btn" style="display: none;">
+            この写真を使用
           </button>
         </div>
       </div>
       
       <!-- 情報入力フォーム（初期状態では非表示） -->
       <div class="info-form-container" style="display: none;">
-        <div class="preview-container">
-          <img id="preview-image" src="" alt="プレビュー">
-        </div>
-        
         <!-- ステップ1: 位置情報入力 -->
         <div class="form-step" id="location-step">
           <div class="step-header">
