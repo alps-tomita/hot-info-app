@@ -83,6 +83,13 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('写真なしで送信が選択されました。ルート：', selectedRoute);
     routeSelectionContainer.style.display = 'none';
     infoFormContainer.style.display = 'block';
+    
+    // 位置情報フィールドを初期化
+    document.getElementById('location-coords').textContent = '位置情報：未取得（手動入力可）';
+    document.getElementById('location-address').value = '';
+    document.getElementById('location-address').placeholder = '住所を入力してください';
+    
+    // 位置情報ステップを表示
     showLocationStep();
     setupCategoryCards();
   });
@@ -133,11 +140,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 位置情報入力から次へボタンのイベントリスナー
   document.getElementById('next-to-category-btn').addEventListener('click', () => {
-    const formData = getFormData();
-    if (!formData.latitude || !formData.longitude) {
-      alert('位置情報が取得できていません');
-      return;
-    }
+    // 位置情報の有無に関わらず次のステップに進めるように修正
+    // すべての位置情報は任意入力とする
     showCategoryStep();
   });
 
@@ -679,6 +683,9 @@ async function getLocation() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       console.log('位置情報がサポートされていません');
+      document.getElementById('location-coords').textContent = '位置情報はサポートされていません';
+      document.getElementById('location-address').placeholder = '住所を入力してください';
+      resolve(null);
       return;
     }
     
@@ -715,7 +722,7 @@ async function getLocation() {
       },
       (error) => {
         console.log('位置情報の取得に失敗しました:', error);
-        document.getElementById('location-coords').textContent = '位置情報を取得できませんでした';
+        document.getElementById('location-coords').textContent = '位置情報を取得できませんでした（手動入力可）';
         document.getElementById('location-address').placeholder = '住所を入力してください';
         resolve(null);
       },
@@ -758,10 +765,22 @@ function getFormData() {
 function sendData(data) {
   console.log('データ送信を開始します:', data);
   
-  // 位置情報がある場合のみ含める
+  // 位置情報がある場合のみ含める（必須ではない）
   if (latitude !== null && longitude !== null) {
     data.latitude = latitude;
     data.longitude = longitude;
+  }
+  
+  // 住所情報も追加（入力された場合のみ）
+  const addressInput = document.getElementById('location-address');
+  if (addressInput && addressInput.value.trim() !== '') {
+    data.address = addressInput.value.trim();
+  }
+  
+  // 補足情報も追加（入力された場合のみ）
+  const detailInput = document.getElementById('location-detail');
+  if (detailInput && detailInput.value.trim() !== '') {
+    data.detail = detailInput.value.trim();
   }
 
   return fetch(API_URL, {
