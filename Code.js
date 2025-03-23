@@ -80,99 +80,47 @@ function logData(prefix, data) {
  */
 function doGet(e) {
   try {
-    // リクエストパラメータをログに記録
-    console.log('GETリクエスト:', JSON.stringify(e.parameter));
+    // リクエストをログに記録
+    console.log('GETリクエスト受信:', e && e.parameter ? JSON.stringify(e.parameter) : 'パラメータなし');
     
-    // リクエストタイプの取得
-    const requestType = e.parameter.requestType || '';
-    const callback = e.parameter.callback || null; // JSONPコールバック関数名
-    
-    let responseData = {};
+    // リクエストタイプの取得（パラメータがない場合はデフォルトで'routes'）
+    const requestType = e && e.parameter && e.parameter.requestType 
+                        ? e.parameter.requestType 
+                        : 'routes';
     
     // リクエストタイプに応じた処理
     if (requestType === 'routes') {
-      // ルート一覧をスプレッドシートから取得
-      try {
-        const routes = getRoutesList();
-        responseData = {
-          status: 'ok',
-          routes: routes
-        };
-      } catch (routeError) {
-        console.error('ルート一覧取得エラー:', routeError);
-        responseData = {
-          status: 'error',
-          message: 'ルート一覧の取得に失敗しました: ' + routeError.message,
-          routes: []
-        };
-      }
-    } else {
-      // フォームデータの保存
-      const route = e.parameter.route || '';
-      const value = e.parameter.value || '';
+      // ルート一覧を取得
+      const routes = getRoutesList();
+      console.log('取得したルート:', routes);
       
-      // データを保存
-      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      const sheet = ss.getSheetByName('GETリクエスト') || ss.insertSheet('GETリクエスト');
-      
-      // 現在時刻を取得
-      const now = new Date();
-      
-      // データを1行追加
-      sheet.appendRow([now, route, value]);
-      
-      // レスポンスデータを作成
-      responseData = {
+      const response = {
         status: 'ok',
-        message: 'データを正常に記録しました',
-        details: {
-          route: route,
-          value: value,
-          timestamp: now.toISOString()
-        }
+        routes: routes
       };
+      
+      // ContentServiceを使用してJSONレスポンスを返す
+      return createCorsJSONResponse(response);
+    } else {
+      // 不正なリクエストタイプの場合
+      const errorResponse = {
+        status: 'error',
+        message: '不正なリクエストタイプです'
+      };
+      
+      return createCorsJSONResponse(errorResponse);
     }
     
-    // レスポンスの生成
-    const jsonString = JSON.stringify(responseData);
-    
-    // JSONPの場合はコールバック関数でラップして返す
-    if (callback) {
-      const content = callback + "(" + jsonString + ");";
-      const output = ContentService.createTextOutput(content);
-      output.setMimeType(ContentService.MimeType.JAVASCRIPT);
-      return output;
-    } else {
-      // 通常のJSONレスポンスを返す
-      const output = ContentService.createTextOutput(jsonString);
-      output.setMimeType(ContentService.MimeType.JSON);
-    return output;
-  }
-  
   } catch (error) {
-    // エラーをログに記録
-    console.error('エラー発生:', error.message, error.stack);
+    console.error('GETリクエスト処理エラー:', error);
     
-    // エラーレスポンスを生成
+    // エラーレスポンスの作成
     const errorResponse = {
       status: 'error',
-      message: error.message
+      message: error.toString()
     };
     
-    const jsonString = JSON.stringify(errorResponse);
-    
-    // コールバック関数の有無に応じたレスポンス形式を選択
-    const callback = e.parameter.callback || null;
-    if (callback) {
-      const content = callback + "(" + jsonString + ");";
-      const output = ContentService.createTextOutput(content);
-      output.setMimeType(ContentService.MimeType.JAVASCRIPT);
-      return output;
-    } else {
-      const output = ContentService.createTextOutput(jsonString);
-      output.setMimeType(ContentService.MimeType.JSON);
-      return output;
-    }
+    return createCorsJSONResponse(errorResponse);
   }
 }
 
@@ -180,62 +128,46 @@ function doGet(e) {
  * HTTP POSTリクエスト処理関数
  */
 function doPost(e) {
-  var output = ContentService.createTextOutput();
-  output.setMimeType(ContentService.MimeType.JSON);
-  
   try {
-    var data = {};
-    // POSTデータの処理
-    if (e.postData && e.postData.contents) {
-      try {
-        data = JSON.parse(e.postData.contents);
-      } catch (parseError) {
-        output.setContent(JSON.stringify({
-          status: "error",
-          message: "JSONパースエラー: " + parseError.toString(),
-          timestamp: new Date().toISOString()
-        }));
-        return output;
-      }
-    }
+    // パラメータ取得
+    const params = JSON.parse(e.postData.contents);
+    console.log('POSTリクエスト受信:', JSON.stringify(params));
     
-    // デバッグログを残す
-    console.log("POSTリクエスト受信: " + JSON.stringify(data));
+    // データシート取得
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("データ受信用");
     
-    // データをスプレッドシートに保存
-    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = spreadsheet.getSheetByName("提出データ");
-    if (!sheet) {
-      sheet = spreadsheet.insertSheet("提出データ");
-      sheet.appendRow(["タイムスタンプ", "ルート", "緯度", "経度", "住所", "画像URL", "詳細情報", "リクエスト元"]);
-    }
-    
-    // データの保存
+    // データ追加
     sheet.appendRow([
-      new Date(),
-      data.route || "",
-      data.latitude || "",
-      data.longitude || "",
-      data.address || "",
-      data.imageUrl || "",
-      data.details || "",
-      e.postData.type || "Unknown"
+      new Date(),           // タイムスタンプ
+      params.route || "",   // ルート名
+      params.latitude || "", // 緯度
+      params.longitude || "", // 経度
+      params.category || "", // カテゴリ
+      params.comment || "",  // コメント
+      params.imageUrl || "", // 画像URL
+      params.address || "", // 住所
+      params.material || "", // 資料配布状況
+      params.progress || ""  // 工事進捗状況
     ]);
     
-    output.setContent(JSON.stringify({
-      status: "ok",
-      message: "データを保存しました",
-      timestamp: new Date().toISOString(),
-      id: sheet.getLastRow() - 1
-    }));
-    return output;
+    // 成功レスポンスを返す
+    const successResponse = {
+      "result": "success"
+    };
+    
+    return createCorsJSONResponse(successResponse);
+    
   } catch (error) {
-    output.setContent(JSON.stringify({
-      status: "error",
-      message: "POSTデータ処理エラー: " + error.toString(),
-      timestamp: new Date().toISOString()
-    }));
-    return output;
+    console.error('POSTリクエスト処理エラー:', error);
+    
+    // エラーレスポンスを返す
+    const errorResponse = {
+      "result": "error",
+      "message": error.toString()
+    };
+    
+    return createCorsJSONResponse(errorResponse);
   }
 }
 
@@ -243,8 +175,24 @@ function doPost(e) {
  * HTTP OPTIONSリクエスト処理関数（CORS対応用）
  */
 function doOptions(e) {
-  var output = ContentService.createTextOutput();
-  output.setMimeType(ContentService.MimeType.TEXT);
+  return ContentService.createTextOutput("")
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
+/**
+ * CORS対応のJSONレスポンスを作成する共通関数
+ */
+function createCorsJSONResponse(data) {
+  // JSONデータを文字列化
+  const jsonString = JSON.stringify(data);
+  
+  // ContentServiceを使用してJSONレスポンスを返す
+  // ContentServiceは最もシンプルなアプローチ
+  const output = ContentService.createTextOutput(jsonString)
+    .setMimeType(ContentService.MimeType.JSON);
+    
+  // CORSヘッダーはWebアプリのデプロイ設定で行う
+  // GASのWebアプリは自動的にCORSを処理する
   return output;
 }
 

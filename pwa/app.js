@@ -4,7 +4,8 @@
  */
 
 // グローバル変数
-const API_URL = 'https://script.google.com/macros/s/AKfycbxKnjzsPCdpBwFChTJgWDY9MB8ZYDrmx0PNmKcAVOK0XNjY701AcYPX7JZ0cfLIkauk/exec';
+// 正常に動作確認済みのAPIエンドポイントURL
+const API_URL = 'https://script.google.com/macros/s/AKfycbz6gw9LrKM9ovOD9e7AyQQKzJy5hB4N7iCU7xzgkQN3nqO9YiRAQm3Xm1vO9KMARyjh/exec';
 let selectedRoute = '';
 let capturedImage = null;
 let latitude = null;
@@ -323,20 +324,40 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchRoutes() {
     try {
       console.log('ルート一覧の取得を開始します');
-      const response = await fetch(`${API_URL}?requestType=routes`);
-        
-        if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      
+      const response = await fetch(`${API_URL}?requestType=routes`, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      console.log('レスポンス:', response);
+      
+      // レスポンスが正常でない場合は、デフォルトルートを表示
+      if (!response.ok) {
+        console.log('サーバーからの応答が正常ではありません。デフォルトルートを表示します。');
+        showDefaultRoutes('サーバーからの応答が正常ではありません');
+        return;
       }
       
       const data = await response.json();
+      console.log('取得したルートデータ:', data);
       
-        if (data.status === 'ok' && Array.isArray(data.routes)) {
-          routeButtonsContainer.innerHTML = '';
-          
+      if (data.status === 'ok' && Array.isArray(data.routes)) {
+        routeButtonsContainer.innerHTML = '';
+        
+        if (data.routes.length === 0) {
+          console.log('ルートが存在しないためデフォルトルートを表示します');
+          showDefaultRoutes('ルートが登録されていません');
+          return;
+        }
+        
         data.routes.forEach(route => {
-            const button = document.createElement('button');
-            button.className = 'route-btn';
+          const button = document.createElement('button');
+          button.className = 'route-btn';
           button.textContent = String(route);
           button.setAttribute('data-route', String(route));
           
@@ -351,12 +372,13 @@ document.addEventListener('DOMContentLoaded', () => {
           
           routeButtonsContainer.appendChild(button);
         });
-        } else {
-        throw new Error('データ形式が不正です');
+      } else {
+        console.log('デフォルトルートを表示します（データ形式不正）');
+        showDefaultRoutes('データ形式が不正です');
       }
     } catch (error) {
       console.error('ルート一覧の取得に失敗しました:', error);
-      showDefaultRoutes(error.message);
+      showDefaultRoutes('ルート一覧の取得に失敗しました');
     }
   }
 
@@ -659,7 +681,7 @@ async function getLocation() {
       console.log('位置情報がサポートされていません');
       return;
     }
-
+    
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const latitude = position.coords.latitude;
@@ -734,6 +756,8 @@ function getFormData() {
  * データを送信する関数
  */
 function sendData(data) {
+  console.log('データ送信を開始します:', data);
+  
   // 位置情報がある場合のみ含める
   if (latitude !== null && longitude !== null) {
     data.latitude = latitude;
@@ -742,15 +766,27 @@ function sendData(data) {
 
   return fetch(API_URL, {
     method: 'POST',
+    mode: 'cors',
+    cache: 'no-cache',
+    credentials: 'omit',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(data)
   })
   .then(response => {
+    console.log('送信レスポンス:', response);
     if (!response.ok) {
-      throw new Error('サーバーエラーが発生しました');
+      throw new Error(`サーバーエラーが発生しました (${response.status})`);
     }
     return response.json();
+  })
+  .then(data => {
+    console.log('送信成功:', data);
+    return data;
+  })
+  .catch(error => {
+    console.error('送信エラー:', error);
+    throw error;
   });
 } 
