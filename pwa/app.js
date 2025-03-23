@@ -4,15 +4,19 @@
  */
 
 // グローバル変数
-// ↓↓↓ ここのURLをGASの新しいデプロイメントURLに更新してください ↓↓↓
 const API_URL = 'https://script.google.com/macros/s/AKfycbxKnjzsPCdpBwFChTJgWDY9MB8ZYDrmx0PNmKcAVOK0XNjY701AcYPX7JZ0cfLIkauk/exec';
-// ↑↑↑ 新しいデプロイメントURLに更新 ↑↑↑
 let selectedRoute = '';
 let capturedImage = null;
 let latitude = null;
 let longitude = null;
 let locationAddress = '';
 let isOnline = navigator.onLine;
+let selectedCategory = null;
+
+// カメラ関連の変数
+let mediaStream = null;
+let videoElement = null;
+let canvasElement = null;
 
 // キャッシュをクリアする関数
 function clearCaches() {
@@ -63,7 +67,119 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // 初期ステータスチェック
   updateOnlineStatus();
-  
+
+  // イベントリスナー：カメラ起動ボタン
+  startCameraBtn.addEventListener('click', () => {
+    console.log('カメラ起動ボタンがクリックされました。ルート：', selectedRoute);
+    startCamera();
+  });
+
+  // カテゴリー選択とコメント入力の画面制御
+  function showCategoryStep() {
+    document.getElementById('category-step').style.display = 'block';
+    document.getElementById('comment-step').style.display = 'none';
+    selectedCategory = null;
+  }
+
+  function showCommentStep() {
+    document.getElementById('category-step').style.display = 'none';
+    document.getElementById('comment-step').style.display = 'block';
+  }
+
+  // ルート選択に戻るボタンのイベントリスナー
+  document.getElementById('back-to-route-btn')?.addEventListener('click', () => {
+    // 写真情報をリセット
+    document.getElementById('preview-image').src = '';
+    capturedImage = null;
+    selectedCategory = null;
+    
+    // ルート選択画面に戻る
+    showRouteSelection();
+  });
+
+  // カテゴリーカードのイベントリスナーを設定
+  function setupCategoryCards() {
+    document.querySelectorAll('.category-card').forEach(card => {
+      card.addEventListener('click', () => {
+        // 他のカードの選択を解除
+        document.querySelectorAll('.category-card').forEach(c => {
+          c.classList.remove('selected');
+        });
+        
+        // 選択したカードを強調表示
+        card.classList.add('selected');
+        selectedCategory = card.dataset.category;
+        
+        // 少し待ってから次のステップへ
+        setTimeout(() => {
+          showCommentStep();
+        }, 300);
+      });
+    });
+  }
+
+  // 戻るボタンのイベントリスナー
+  document.getElementById('back-btn')?.addEventListener('click', () => {
+    showCategoryStep();
+  });
+
+  // 送信ボタンのイベントリスナー
+  document.getElementById('submit-btn')?.addEventListener('click', async () => {
+    const comment = document.getElementById('comment-input').value.trim();
+    
+    if (!comment) {
+      alert('コメントを入力してください');
+      return;
+    }
+
+    // ローディング表示
+    const loadingContainer = document.querySelector('.loading-container');
+    loadingContainer.style.display = 'flex';
+
+    try {
+      // データを送信
+      const data = {
+        requestType: 'submit',
+        route: selectedRoute,
+        category: selectedCategory,
+        comment: comment,
+        image: capturedImage,
+        latitude: latitude,
+        longitude: longitude,
+        locationAddress: locationAddress
+      };
+
+      const response = await sendData(data);
+      
+      if (response.status === 'ok') {
+        // 完了画面を表示
+        document.querySelector('.info-form-container').style.display = 'none';
+        document.querySelector('.complete-container').style.display = 'block';
+      } else {
+        throw new Error(response.message || '送信に失敗しました');
+      }
+    } catch (error) {
+      console.error('データ送信エラー:', error);
+      alert('送信に失敗しました: ' + error.message);
+    } finally {
+      // ローディング非表示
+      loadingContainer.style.display = 'none';
+    }
+  });
+
+  // 新規登録ボタンのイベントリスナー
+  document.getElementById('new-report-btn')?.addEventListener('click', () => {
+    // フォームをリセット
+    document.getElementById('comment-input').value = '';
+    document.getElementById('preview-image').src = '';
+    capturedImage = null;
+    selectedCategory = null;
+    
+    // 画面を初期状態に戻す
+    document.querySelector('.complete-container').style.display = 'none';
+    showRouteSelection();
+  });
+
   /**
    * オンライン/オフラインステータスを更新する関数
    */
@@ -75,49 +191,25 @@ document.addEventListener('DOMContentLoaded', () => {
       offlineMessage.style.display = 'block';
     }
   }
-  
+
   /**
    * ルート一覧を取得する関数
    */
   async function fetchRoutes() {
     try {
       console.log('ルート一覧の取得を開始します');
-      console.log('API URL:', `${API_URL}?requestType=routes`);
-      
       const response = await fetch(`${API_URL}?requestType=routes`);
-      console.log('APIレスポンス:', response);
-      console.log('レスポンスヘッダー:', Object.fromEntries(response.headers.entries()));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const text = await response.text();
-      console.log('生のレスポンス:', text);
-      
-      let data;
-      try {
-        data = JSON.parse(text);
-        console.log('パースしたデータ:', data);
-      } catch (e) {
-        console.error('JSONパースエラー:', e);
-        throw new Error('レスポンスのJSONパースに失敗しました');
-      }
-      
-      if (!data) {
-        throw new Error('データが空です');
-      }
-      
-      console.log('データの型:', typeof data);
-      console.log('データのキー:', Object.keys(data));
+      const data = await response.json();
       
       if (data.status === 'ok' && Array.isArray(data.routes)) {
-        console.log('ルートデータ:', data.routes);
-        const routeButtonsContainer = document.querySelector('.route-buttons-container');
         routeButtonsContainer.innerHTML = '';
         
         data.routes.forEach(route => {
-          console.log('ルート項目:', route, typeof route);
           const button = document.createElement('button');
           button.className = 'route-btn';
           button.textContent = String(route);
@@ -129,20 +221,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             button.classList.add('selected');
             selectedRoute = String(route);
-            console.log('選択されたルート:', selectedRoute);
-            
-            // カメラセクションを表示
-            cameraSection.classList.remove('hidden');
-            infoSection.classList.add('hidden');
-            startCamera();
+            cameraButtonContainer.style.display = 'block';
           });
           
           routeButtonsContainer.appendChild(button);
         });
-        
-        console.log('ルート一覧の表示が完了しました');
       } else {
-        console.error('ルートデータの形式が不正です:', data);
         throw new Error('データ形式が不正です');
       }
     } catch (error) {
@@ -150,21 +234,11 @@ document.addEventListener('DOMContentLoaded', () => {
       showDefaultRoutes(error.message);
     }
   }
-  
+
   /**
    * デフォルトのルート一覧を表示する補助関数
    */
   function showDefaultRoutes(errorMessage) {
-    // エラーメッセージをユーザーフレンドリーに変換
-    let userMessage = 'ルート一覧を取得できませんでした。';
-    if (errorMessage) {
-      userMessage += ' ' + errorMessage;
-    }
-    
-    // エラー時はデフォルトのルート一覧を表示
-    routeButtonsContainer.innerHTML = '';
-    
-    // デフォルトのルート一覧（実際のデータに合わせて修正）
     const defaultRoutes = [
       "東京都心エリア", "東京西部エリア", "東京東部エリア", "東京北部エリア", 
       "東京南部エリア", "横浜中央エリア", "横浜北部エリア", "横浜南部エリア", 
@@ -172,59 +246,160 @@ document.addEventListener('DOMContentLoaded', () => {
       "千葉中央エリア", "千葉西部エリア"
     ];
     
-    console.log('デフォルトルート一覧を表示:', defaultRoutes);
-    
+    routeButtonsContainer.innerHTML = '';
     defaultRoutes.forEach(routeName => {
       const button = document.createElement('button');
       button.className = 'route-btn';
       button.setAttribute('data-route', routeName);
       button.textContent = routeName;
-      
-      // クリックイベントを追加
       button.addEventListener('click', handleRouteButtonClick);
-      
-      // コンテナに追加
       routeButtonsContainer.appendChild(button);
     });
-    
-    // エラーメッセージを表示
-    const errorMsg = document.createElement('div');
-    errorMsg.className = 'error-message';
-    errorMsg.textContent = userMessage;
-    routeButtonsContainer.insertAdjacentElement('afterbegin', errorMsg);
   }
-  
+
   /**
    * ルートボタンのクリックイベントハンドラ
    */
   function handleRouteButtonClick(e) {
-    // 前に選択されたボタンから選択状態を削除
     document.querySelectorAll('.route-btn.selected').forEach(btn => {
       btn.classList.remove('selected');
     });
-    
-    // クリックされたボタンを選択状態にする
     e.currentTarget.classList.add('selected');
-    
-    // ルート名を取得して保存
     selectedRoute = e.currentTarget.getAttribute('data-route');
-    console.log('選択されたルート：', selectedRoute);
-    
-    // カメラボタンを表示
     cameraButtonContainer.style.display = 'block';
   }
-  
-  // イベントリスナー：カメラ起動ボタン
-  startCameraBtn.addEventListener('click', () => {
-    // この時点ではまだカメラ起動機能は実装していないので、
-    // コンソールにメッセージを出力するだけ
-    console.log('カメラ起動ボタンがクリックされました。ルート：', selectedRoute);
-    alert('カメラ機能は次のステップで実装します。ルート：' + selectedRoute);
-  });
+
+  /**
+   * カメラを起動する関数
+   */
+  async function startCamera() {
+    try {
+      videoElement = document.getElementById('camera-view');
+      canvasElement = document.getElementById('camera-canvas');
+      
+      cameraContainer.style.display = 'block';
+      routeSelectionContainer.style.display = 'none';
+      
+      const constraints = {
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      };
+      
+      mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      videoElement.srcObject = mediaStream;
+      await videoElement.play();
+      
+      setupCameraEventListeners();
+      
+    } catch (error) {
+      console.error('カメラの起動に失敗しました:', error);
+      handleCameraError(error);
+    }
+  }
+
+  /**
+   * カメラのイベントリスナーを設定する関数
+   */
+  function setupCameraEventListeners() {
+    const captureBtn = document.getElementById('capture-btn');
+    const cancelBtn = document.getElementById('cancel-camera-btn');
+    
+    captureBtn.addEventListener('click', capturePhoto);
+    cancelBtn.addEventListener('click', () => {
+      stopCamera();
+      showRouteSelection();
+    });
+  }
+
+  /**
+   * 写真を撮影する関数
+   */
+  async function capturePhoto() {
+    try {
+      canvasElement.width = videoElement.videoWidth;
+      canvasElement.height = videoElement.videoHeight;
+      
+      const context = canvasElement.getContext('2d');
+      context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+      
+      capturedImage = canvasElement.toDataURL('image/jpeg', 0.8);
+      stopCamera();
+      showPreview();
+      
+      getLocation()
+        .then(location => {
+          document.getElementById('location-text').textContent = 
+            `位置情報: 緯度 ${location.latitude.toFixed(6)}, 経度 ${location.longitude.toFixed(6)}`;
+        })
+        .catch(error => {
+          document.getElementById('location-text').textContent = '位置情報: 取得できませんでした';
+        });
+      
+    } catch (error) {
+      console.error('写真の撮影に失敗しました:', error);
+      alert('写真の撮影に失敗しました。もう一度お試しください。');
+    }
+  }
+
+  /**
+   * カメラを停止する関数
+   */
+  function stopCamera() {
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+      mediaStream = null;
+    }
+    if (videoElement) {
+      videoElement.srcObject = null;
+    }
+  }
+
+  /**
+   * プレビューを表示する関数
+   */
+  function showPreview() {
+    const previewImage = document.getElementById('preview-image');
+    previewImage.src = capturedImage;
+    
+    cameraContainer.style.display = 'none';
+    infoFormContainer.style.display = 'block';
+    setupCategoryCards();
+  }
+
+  /**
+   * ルート選択画面を表示する関数
+   */
+  function showRouteSelection() {
+    routeSelectionContainer.style.display = 'block';
+    cameraContainer.style.display = 'none';
+    infoFormContainer.style.display = 'none';
+  }
+
+  /**
+   * カメラエラーを処理する関数
+   */
+  function handleCameraError(error) {
+    let errorMessage = 'カメラの起動に失敗しました。';
+    
+    if (error.name === 'NotAllowedError') {
+      errorMessage = 'カメラへのアクセスが許可されていません。ブラウザの設定でカメラへのアクセスを許可してください。';
+    } else if (error.name === 'NotFoundError') {
+      errorMessage = 'カメラが見つかりません。デバイスにカメラが接続されているか確認してください。';
+    } else if (error.name === 'NotReadableError') {
+      errorMessage = 'カメラにアクセスできません。他のアプリケーションがカメラを使用していないか確認してください。';
+    }
+    
+    alert(errorMessage);
+    showRouteSelection();
+  }
 });
 
 /**
- * 位置情報を取得する関数（将来実装）
+ * 位置情報を取得する関数
  */
 function getLocation() {
   return new Promise((resolve, reject) => {
@@ -237,10 +412,7 @@ function getLocation() {
       (position) => {
         latitude = position.coords.latitude;
         longitude = position.coords.longitude;
-        resolve({
-          latitude,
-          longitude
-        });
+        resolve({ latitude, longitude });
       },
       (error) => {
         reject(error);
@@ -255,7 +427,7 @@ function getLocation() {
 }
 
 /**
- * データを送信する関数（将来実装）
+ * データを送信する関数
  */
 function sendData(data) {
   return fetch(API_URL, {

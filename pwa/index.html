@@ -12,12 +12,8 @@
 </head>
 <body>
   <div class="app-container">
-    <header>
-      <h1>HOT情報送信アプリ</h1>
-    </header>
-    
     <!-- オフラインメッセージ -->
-    <div id="offline-message">
+    <div id="offline-message" style="display: none;">
       <p>インターネット接続がありません。情報はオフラインで保存され、接続時に送信されます。</p>
     </div>
     
@@ -60,32 +56,70 @@
           <img id="preview-image" src="" alt="プレビュー">
         </div>
         
-        <form id="info-form">
-          <div class="form-group">
-            <label for="category-select">カテゴリ：</label>
-            <select id="category-select" class="form-control" required>
-              <option value="">-- カテゴリを選択 --</option>
-              <option value="飲食店">飲食店</option>
-              <option value="小売店">小売店</option>
-              <option value="サービス">サービス業</option>
-              <option value="その他">その他</option>
-            </select>
+        <!-- ステップ1: カテゴリー選択 -->
+        <div class="form-step" id="category-step">
+          <div class="step-header">
+            <button type="button" id="back-to-route-btn" class="secondary-btn">← ルート選択に戻る</button>
+            <h2>カテゴリを選択してください</h2>
           </div>
-          
+          <div class="category-cards">
+            <div class="category-card" data-category="カフェ">
+              <span class="category-icon">☕</span>
+              <span class="category-name">カフェ</span>
+            </div>
+            <div class="category-card" data-category="バー">
+              <span class="category-icon">🍸</span>
+              <span class="category-name">バー</span>
+            </div>
+            <div class="category-card" data-category="居酒屋">
+              <span class="category-icon">🍶</span>
+              <span class="category-name">居酒屋</span>
+            </div>
+            <div class="category-card" data-category="和食">
+              <span class="category-icon">🍱</span>
+              <span class="category-name">和食</span>
+            </div>
+            <div class="category-card" data-category="洋食">
+              <span class="category-icon">🍽️</span>
+              <span class="category-name">洋食</span>
+            </div>
+            <div class="category-card" data-category="中華">
+              <span class="category-icon">🥢</span>
+              <span class="category-name">中華</span>
+            </div>
+            <div class="category-card" data-category="ラーメン">
+              <span class="category-icon">🍜</span>
+              <span class="category-name">ラーメン</span>
+            </div>
+            <div class="category-card" data-category="焼肉">
+              <span class="category-icon">🥩</span>
+              <span class="category-name">焼肉</span>
+            </div>
+            <div class="category-card" data-category="夜店">
+              <span class="category-icon">🏮</span>
+              <span class="category-name">夜店</span>
+            </div>
+            <div class="category-card" data-category="その他">
+              <span class="category-icon">📌</span>
+              <span class="category-name">その他</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ステップ2: コメント入力 -->
+        <div class="form-step" id="comment-step" style="display: none;">
+          <h2>コメントを入力してください</h2>
           <div class="form-group">
-            <label for="comment-input">コメント：</label>
             <textarea id="comment-input" class="form-control" rows="3" placeholder="例：新しいカフェがオープンしました"></textarea>
           </div>
-          
           <div class="location-info">
             <p id="location-text">位置情報: 取得中...</p>
           </div>
-          
           <div class="form-actions">
             <button type="button" id="submit-btn" class="primary-btn">送信する</button>
-            <button type="button" id="retake-btn" class="secondary-btn">撮り直す</button>
+            <button type="button" id="back-btn" class="secondary-btn">戻る</button>
           </div>
-        </form>
+        </div>
       </div>
       
       <!-- ローディングインジケータ -->

@@ -63,13 +63,14 @@ header h1 {
 /* メインコンテンツ */
 main {
   flex: 1;
-  padding: 20px;
+  padding: 12px;
   overflow-y: auto;
+  padding-top: 12px;  /* オフラインメッセージが表示される場合のスペース確保 */
 }
 
 h2 {
-  font-size: 1.2rem;
-  margin-bottom: 16px;
+  font-size: 1.1rem;
+  margin-bottom: 12px;
   color: var(--primary-dark);
   text-align: center;
 }
@@ -135,13 +136,20 @@ button {
 }
 
 .secondary-btn {
-  background-color: var(--light-gray);
+  background-color: var(--white);
+  border: 2px solid var(--mid-gray);
   color: var(--text-color);
-  border: 1px solid var(--mid-gray);
+  padding: 8px 16px;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
 }
 
 .secondary-btn:hover {
-  background-color: var(--mid-gray);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background-color: var(--light-gray);
 }
 
 .action-btn {
@@ -296,14 +304,27 @@ footer {
 /* オフラインメッセージ */
 #offline-message {
   position: fixed;
-  bottom: 0;
+  top: 0;
   left: 0;
   width: 100%;
-  padding: 12px;
+  padding: 8px;
   background-color: var(--accent-color);
-  color: white;
+  color: var(--white);
   text-align: center;
-  z-index: 30;
+  z-index: 1000;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#offline-message p {
+  margin: 0;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+/* オフラインメッセージが表示されているときのメインコンテンツの調整 */
+#offline-message:not([style*="display: none"]) + main {
+  padding-top: 48px;  /* オフラインメッセージの高さ + 通常のパディング */
 }
 
 /* レスポンシブ設定 */
@@ -403,38 +424,6 @@ footer {
   100% { transform: rotate(360deg); }
 }
 
-/* フッター */
-footer {
-  background-color: var(--light-gray);
-  color: var(--dark-gray);
-  padding: 16px;
-  text-align: center;
-  font-size: 0.8rem;
-}
-
-/* オフラインメッセージ */
-#offline-message {
-  background-color: #ffeedc;
-  color: #e67e22;
-  text-align: center;
-  padding: 10px;
-  border-radius: 4px;
-  margin-bottom: 15px;
-  display: none;
-}
-
-/* オフラインステータス */
-.offline-message {
-  background-color: #f9e4a1;
-  border: 1px solid #f5c23d;
-  color: #8a6d3b;
-  padding: 8px 12px;
-  margin-bottom: 15px;
-  border-radius: 4px;
-  text-align: center;
-  font-size: 14px;
-}
-
 /* レスポンシブ対応を削除（常に2列にするため） */
 @media (max-width: 600px) {
   body {
@@ -450,4 +439,145 @@ footer {
     min-width: calc(50% - 10px);
   }
   */
+}
+
+/* フォームステップ */
+.form-step {
+  background-color: var(--white);
+  border-radius: var(--border-radius);
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.form-step h2 {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  color: var(--primary-dark);
+  text-align: center;
+}
+
+/* ステップヘッダー */
+.step-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.step-header h2 {
+  width: 100%;
+  margin: 0;
+  text-align: center;
+}
+
+/* カテゴリーカード */
+.category-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin: 0;
+}
+
+.category-card {
+  background-color: var(--white);
+  border: 2px solid var(--mid-gray);
+  border-radius: var(--border-radius);
+  padding: 8px 4px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  aspect-ratio: 1.2;
+}
+
+.category-card:hover {
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.category-card.selected {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: var(--white);
+  animation: cardPop 0.3s ease;
+}
+
+.category-icon {
+  font-size: 1.5rem;
+}
+
+.category-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* コメント入力フォーム */
+#comment-step {
+  max-width: 100%;
+}
+
+#comment-input {
+  width: 100%;
+  min-height: 100px;
+  padding: 12px;
+  border: 2px solid var(--mid-gray);
+  border-radius: var(--border-radius);
+  font-size: 1rem;
+  resize: vertical;
+  margin-bottom: 16px;
+}
+
+#comment-input:focus {
+  border-color: var(--primary-color);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .category-cards {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  
+  .category-card {
+    padding: 8px 4px;
+    aspect-ratio: 1;
+  }
+  
+  .category-icon {
+    font-size: 1.8rem;
+  }
+  
+  .category-name {
+    font-size: 0.9rem;
+  }
+}
+
+/* アニメーション */
+@keyframes cardPop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.form-step {
+  animation: slideIn 0.3s ease;
 } 
