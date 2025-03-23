@@ -10,8 +10,11 @@ let capturedImage = null;
 let latitude = null;
 let longitude = null;
 let locationAddress = '';
+let locationDetail = '';  // 追加：位置情報の詳細（ビル名など）
 let isOnline = navigator.onLine;
 let selectedCategory = null;
+let selectedMaterial = null;  // 選択された資料配布状況
+let selectedProgress = null;  // 選択された工事進捗状況
 
 // カメラ関連の変数
 let mediaStream = null;
@@ -74,43 +77,148 @@ document.addEventListener('DOMContentLoaded', () => {
     startCamera();
   });
 
-  // カテゴリー選択とコメント入力の画面制御
-  function showCategoryStep() {
-    document.getElementById('category-step').style.display = 'block';
+  // イベントリスナー：写真なしで送信ボタン
+  document.getElementById('no-photo-btn')?.addEventListener('click', () => {
+    console.log('写真なしで送信が選択されました。ルート：', selectedRoute);
+    routeSelectionContainer.style.display = 'none';
+    infoFormContainer.style.display = 'block';
+    document.getElementById('location-text').style.display = 'none';
+    setupCategoryCards();
+  });
+
+  // 画面制御関数を更新
+  function showLocationStep() {
+    document.getElementById('location-step').style.display = 'block';
+    document.getElementById('category-step').style.display = 'none';
+    document.getElementById('material-step').style.display = 'none';
+    document.getElementById('progress-step').style.display = 'none';
     document.getElementById('comment-step').style.display = 'none';
-    selectedCategory = null;
+  }
+
+  function showCategoryStep() {
+    document.getElementById('location-step').style.display = 'none';
+    document.getElementById('category-step').style.display = 'block';
+    document.getElementById('material-step').style.display = 'none';
+    document.getElementById('progress-step').style.display = 'none';
+    document.getElementById('comment-step').style.display = 'none';
+    setupCategoryCards();
+  }
+
+  function showMaterialStep() {
+    document.getElementById('location-step').style.display = 'none';
+    document.getElementById('category-step').style.display = 'none';
+    document.getElementById('material-step').style.display = 'block';
+    document.getElementById('progress-step').style.display = 'none';
+    document.getElementById('comment-step').style.display = 'none';
+    setupMaterialCards();
+  }
+
+  function showProgressStep() {
+    document.getElementById('location-step').style.display = 'none';
+    document.getElementById('category-step').style.display = 'none';
+    document.getElementById('material-step').style.display = 'none';
+    document.getElementById('progress-step').style.display = 'block';
+    document.getElementById('comment-step').style.display = 'none';
+    setupProgressCards();
   }
 
   function showCommentStep() {
+    document.getElementById('location-step').style.display = 'none';
     document.getElementById('category-step').style.display = 'none';
+    document.getElementById('material-step').style.display = 'none';
+    document.getElementById('progress-step').style.display = 'none';
     document.getElementById('comment-step').style.display = 'block';
   }
+
+  // 位置情報入力から次へボタンのイベントリスナー
+  document.getElementById('next-to-category-btn')?.addEventListener('click', () => {
+    locationDetail = document.getElementById('location-detail').value.trim();
+    showCategoryStep();
+  });
+
+  // カテゴリー選択の戻るボタンのイベントリスナー
+  document.getElementById('back-to-location-btn')?.addEventListener('click', () => {
+    showLocationStep();
+  });
 
   // ルート選択に戻るボタンのイベントリスナー
   document.getElementById('back-to-route-btn')?.addEventListener('click', () => {
     // 写真情報をリセット
     document.getElementById('preview-image').src = '';
+    document.getElementById('location-detail').value = '';
     capturedImage = null;
     selectedCategory = null;
+    locationDetail = '';
     
     // ルート選択画面に戻る
     showRouteSelection();
   });
 
-  // カテゴリーカードのイベントリスナーを設定
+  // カテゴリーカードのイベントリスナーを更新
   function setupCategoryCards() {
-    document.querySelectorAll('.category-card').forEach(card => {
-      card.addEventListener('click', () => {
-        // 他のカードの選択を解除
-        document.querySelectorAll('.category-card').forEach(c => {
-          c.classList.remove('selected');
-        });
+    console.log('カテゴリーカードのセットアップを開始');
+    const cards = document.querySelectorAll('.category-card');
+    
+    cards.forEach(card => {
+      const newCard = card.cloneNode(true);
+      card.parentNode.replaceChild(newCard, card);
+      
+      newCard.addEventListener('click', () => {
+        console.log('カテゴリーがクリックされました:', newCard.dataset.category);
         
-        // 選択したカードを強調表示
-        card.classList.add('selected');
-        selectedCategory = card.dataset.category;
+        cards.forEach(c => c.classList.remove('selected'));
+        newCard.classList.add('selected');
+        selectedCategory = newCard.dataset.category;
         
-        // 少し待ってから次のステップへ
+        // カテゴリー選択後、資料配布状況の選択へ
+        setTimeout(() => {
+          showMaterialStep();
+        }, 300);
+      });
+    });
+  }
+
+  // 資料配布状況カードのイベントリスナーを設定
+  function setupMaterialCards() {
+    console.log('資料配布状況カードのセットアップを開始');
+    const cards = document.querySelectorAll('.material-card');
+    
+    cards.forEach(card => {
+      const newCard = card.cloneNode(true);
+      card.parentNode.replaceChild(newCard, card);
+      
+      newCard.addEventListener('click', () => {
+        console.log('資料配布状況がクリックされました:', newCard.dataset.material);
+        
+        cards.forEach(c => c.classList.remove('selected'));
+        newCard.classList.add('selected');
+        selectedMaterial = newCard.dataset.material;
+        
+        // 資料配布状況選択後、工事進捗状況の選択へ
+        setTimeout(() => {
+          showProgressStep();
+        }, 300);
+      });
+    });
+  }
+
+  // 工事進捗状況カードのイベントリスナーを設定
+  function setupProgressCards() {
+    console.log('工事進捗状況カードのセットアップを開始');
+    const cards = document.querySelectorAll('.progress-card');
+    
+    cards.forEach(card => {
+      const newCard = card.cloneNode(true);
+      card.parentNode.replaceChild(newCard, card);
+      
+      newCard.addEventListener('click', () => {
+        console.log('工事進捗状況がクリックされました:', newCard.dataset.progress);
+        
+        cards.forEach(c => c.classList.remove('selected'));
+        newCard.classList.add('selected');
+        selectedProgress = newCard.dataset.progress;
+        
+        // 工事進捗状況選択後、コメント入力へ
         setTimeout(() => {
           showCommentStep();
         }, 300);
@@ -118,9 +226,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 戻るボタンのイベントリスナー
-  document.getElementById('back-btn')?.addEventListener('click', () => {
+  // 戻るボタンのイベントリスナーを更新
+  document.getElementById('back-to-category-btn')?.addEventListener('click', () => {
     showCategoryStep();
+  });
+
+  document.getElementById('back-to-material-btn')?.addEventListener('click', () => {
+    showMaterialStep();
+  });
+
+  document.getElementById('back-btn')?.addEventListener('click', () => {
+    showProgressStep();
   });
 
   // 送信ボタンのイベントリスナー
@@ -142,11 +258,16 @@ document.addEventListener('DOMContentLoaded', () => {
         requestType: 'submit',
         route: selectedRoute,
         category: selectedCategory,
+        material: selectedMaterial,
+        progress: selectedProgress,  // 工事進捗状況を追加
         comment: comment,
         image: capturedImage,
-        latitude: latitude,
-        longitude: longitude,
-        locationAddress: locationAddress
+        locationDetail: locationDetail,
+        ...(capturedImage && {
+          latitude: latitude,
+          longitude: longitude,
+          locationAddress: locationAddress
+        })
       };
 
       const response = await sendData(data);
@@ -179,7 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.complete-container').style.display = 'none';
     showRouteSelection();
   });
-
+  
   /**
    * オンライン/オフラインステータスを更新する関数
    */
@@ -191,7 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
       offlineMessage.style.display = 'block';
     }
   }
-
+  
   /**
    * ルート一覧を取得する関数
    */
@@ -199,19 +320,19 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       console.log('ルート一覧の取得を開始します');
       const response = await fetch(`${API_URL}?requestType=routes`);
-      
-      if (!response.ok) {
+        
+        if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
       
-      if (data.status === 'ok' && Array.isArray(data.routes)) {
-        routeButtonsContainer.innerHTML = '';
-        
+        if (data.status === 'ok' && Array.isArray(data.routes)) {
+          routeButtonsContainer.innerHTML = '';
+          
         data.routes.forEach(route => {
-          const button = document.createElement('button');
-          button.className = 'route-btn';
+            const button = document.createElement('button');
+            button.className = 'route-btn';
           button.textContent = String(route);
           button.setAttribute('data-route', String(route));
           
@@ -226,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
           
           routeButtonsContainer.appendChild(button);
         });
-      } else {
+        } else {
         throw new Error('データ形式が不正です');
       }
     } catch (error) {
@@ -239,24 +360,24 @@ document.addEventListener('DOMContentLoaded', () => {
    * デフォルトのルート一覧を表示する補助関数
    */
   function showDefaultRoutes(errorMessage) {
-    const defaultRoutes = [
+        const defaultRoutes = [
       "東京都心エリア", "東京西部エリア", "東京東部エリア", "東京北部エリア", 
       "東京南部エリア", "横浜中央エリア", "横浜北部エリア", "横浜南部エリア", 
       "川崎エリア", "埼玉中央エリア", "埼玉西部エリア", "埼玉東部エリア", 
       "千葉中央エリア", "千葉西部エリア"
-    ];
-    
+        ];
+        
     routeButtonsContainer.innerHTML = '';
-    defaultRoutes.forEach(routeName => {
-      const button = document.createElement('button');
-      button.className = 'route-btn';
-      button.setAttribute('data-route', routeName);
-      button.textContent = routeName;
-      button.addEventListener('click', handleRouteButtonClick);
-      routeButtonsContainer.appendChild(button);
-    });
+        defaultRoutes.forEach(routeName => {
+          const button = document.createElement('button');
+          button.className = 'route-btn';
+          button.setAttribute('data-route', routeName);
+          button.textContent = routeName;
+          button.addEventListener('click', handleRouteButtonClick);
+          routeButtonsContainer.appendChild(button);
+      });
   }
-
+  
   /**
    * ルートボタンのクリックイベントハンドラ
    */
@@ -268,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectedRoute = e.currentTarget.getAttribute('data-route');
     cameraButtonContainer.style.display = 'block';
   }
-
+  
   /**
    * カメラを起動する関数
    */
@@ -330,19 +451,96 @@ document.addEventListener('DOMContentLoaded', () => {
       stopCamera();
       showPreview();
       
-      getLocation()
-        .then(location => {
+      // 位置情報の取得を試みる
+      try {
+        // まず写真のEXIF情報から位置情報の取得を試みる
+        const exifLocation = await getExifLocation();
+        if (exifLocation) {
+          latitude = exifLocation.latitude;
+          longitude = exifLocation.longitude;
           document.getElementById('location-text').textContent = 
-            `位置情報: 緯度 ${location.latitude.toFixed(6)}, 経度 ${location.longitude.toFixed(6)}`;
-        })
-        .catch(error => {
-          document.getElementById('location-text').textContent = '位置情報: 取得できませんでした';
-        });
+            `位置情報(EXIF): 緯度 ${latitude.toFixed(6)}, 経度 ${longitude.toFixed(6)}`;
+          return;
+        }
+
+        // EXIF情報が取得できない場合はデバイスの位置情報を取得
+        const location = await getLocation();
+        latitude = location.latitude;
+        longitude = location.longitude;
+        document.getElementById('location-text').textContent = 
+          `位置情報(GPS): 緯度 ${latitude.toFixed(6)}, 経度 ${longitude.toFixed(6)}`;
+      } catch (error) {
+        console.error('位置情報の取得に失敗しました:', error);
+        document.getElementById('location-text').textContent = '位置情報: 取得できませんでした';
+        // 位置情報が取得できない場合はnullを設定
+        latitude = null;
+        longitude = null;
+      }
       
     } catch (error) {
       console.error('写真の撮影に失敗しました:', error);
       alert('写真の撮影に失敗しました。もう一度お試しください。');
     }
+  }
+
+  /**
+   * 写真のEXIF情報から位置情報を取得する関数
+   */
+  function getExifLocation() {
+    return new Promise((resolve, reject) => {
+      try {
+        // Base64画像データをBlobに変換
+        const base64Data = capturedImage.split(',')[1];
+        const binary = atob(base64Data);
+        const array = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          array[i] = binary.charCodeAt(i);
+        }
+        const blob = new Blob([array], { type: 'image/jpeg' });
+
+        // BlobからFileオブジェクトを作成
+        const file = new File([blob], "photo.jpg", { type: 'image/jpeg' });
+
+        EXIF.getData(file, function() {
+          const exifData = EXIF.getAllTags(this);
+          console.log('EXIF情報:', exifData);
+
+          if (exifData && exifData.GPSLatitude && exifData.GPSLongitude) {
+            // EXIF座標を10進数に変換
+            const latitude = convertDMSToDD(
+              exifData.GPSLatitude[0],
+              exifData.GPSLatitude[1],
+              exifData.GPSLatitude[2],
+              exifData.GPSLatitudeRef
+            );
+            const longitude = convertDMSToDD(
+              exifData.GPSLongitude[0],
+              exifData.GPSLongitude[1],
+              exifData.GPSLongitude[2],
+              exifData.GPSLongitudeRef
+            );
+
+            resolve({ latitude, longitude });
+          } else {
+            resolve(null);
+          }
+        });
+      } catch (error) {
+        console.error('EXIF情報の取得に失敗:', error);
+        resolve(null);
+      }
+    });
+  }
+
+  /**
+   * 度分秒（DMS）から10進数（DD）に変換する関数
+   */
+  function convertDMSToDD(degrees, minutes, seconds, direction) {
+    let dd = degrees + minutes/60 + seconds/3600;
+    if (direction === 'S' || direction === 'W') {
+      dd = dd * -1;
+    }
+    return dd;
   }
 
   /**
@@ -367,7 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     cameraContainer.style.display = 'none';
     infoFormContainer.style.display = 'block';
-    setupCategoryCards();
+    showLocationStep();  // 位置情報入力ステップを表示
   }
 
   /**
@@ -410,9 +608,10 @@ function getLocation() {
     
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        latitude = position.coords.latitude;
-        longitude = position.coords.longitude;
-        resolve({ latitude, longitude });
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        });
       },
       (error) => {
         reject(error);
@@ -430,6 +629,12 @@ function getLocation() {
  * データを送信する関数
  */
 function sendData(data) {
+  // 位置情報がある場合のみ含める
+  if (latitude !== null && longitude !== null) {
+    data.latitude = latitude;
+    data.longitude = longitude;
+  }
+
   return fetch(API_URL, {
     method: 'POST',
     headers: {
