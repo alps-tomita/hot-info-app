@@ -402,29 +402,30 @@ footer {
 /* ルート選択ボタン */
 .route-buttons-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;  /* 常に2列表示 */
-  gap: 10px;
-  margin: 20px 0 30px;
+  grid-template-columns: repeat(3, 1fr);  /* 3列に変更 */
+  gap: 8px;  /* 隙間を調整 */
+  margin: 12px 0 20px;  /* マージンを調整 */
   width: 100%;
 }
 
 .route-btn {
-  padding: 16px 8px;
+  padding: 8px 4px;  /* パディングを調整 */
   background-color: var(--light-gray);
   border: 1px solid var(--mid-gray);
   border-radius: var(--border-radius);
-  font-size: 0.95rem;
+  font-size: 0.85rem;  /* フォントサイズを調整 */
   cursor: pointer;
   transition: all 0.2s ease;
-  height: 60px;         /* 固定の高さを設定 */
+  height: 48px;  /* 高さを調整 */
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   overflow: hidden;
-  white-space: normal;  /* テキストを必要に応じて折り返す */
-  word-break: keep-all; /* 日本語の単語の途中で改行させない */
-  width: 100%;          /* 親要素の幅いっぱいに広げる */
+  white-space: normal;
+  word-break: keep-all;
+  width: 100%;
+  aspect-ratio: 0.9;  /* より縦長に */
 }
 
 .route-btn:hover {
@@ -521,49 +522,156 @@ footer {
   text-align: center;
 }
 
-/* カテゴリーカード */
-.category-cards, .material-cards, .progress-cards {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);  /* 2列に変更 */
-  gap: 12px;
-  margin: 16px 0;
-}
-
+/* カード共通スタイル */
 .category-card, .material-card, .progress-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 16px 8px;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
   background-color: white;
   text-align: center;
+}
+
+/* カテゴリーカード */
+.category-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);  /* 3列 */
+  gap: 8px;
+  margin: 12px 0;
+}
+
+/* 資料配布と工事進捗カード */
+.material-cards, .progress-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);  /* 2列 */
+  gap: 8px;
+  margin: 12px 0;
+}
+
+/* カテゴリーカードのサイズ調整 */
+.category-card {
+  padding: 8px 4px;
+  aspect-ratio: 0.9;
+}
+
+/* 資料配布と工事進捗カードのサイズ */
+.material-card, .progress-card {
+  padding: 12px 8px;
   aspect-ratio: 1;
 }
 
+/* アイコン共通スタイル */
+.category-icon, .material-icon, .progress-icon {
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* カテゴリーアイコンのサイズ */
+.category-icon {
+  font-size: 20px;
+}
+
+/* 資料配布と工事進捗アイコンのサイズ */
+.material-icon, .progress-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+/* テキスト共通スタイル */
+.category-name, .material-name, .progress-name {
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* カテゴリー名のサイズ */
+.category-name {
+  font-size: 0.75rem;
+}
+
+/* 資料配布と工事進捗の名前サイズ */
+.material-name, .progress-name {
+  font-size: 0.8rem;
+}
+
+/* ホバーエフェクト */
 .category-card:hover, .material-card:hover, .progress-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+/* 選択状態 */
 .category-card.selected, .material-card.selected, .progress-card.selected {
   background-color: #e3f2fd;
   border-color: #2196f3;
 }
 
-.category-icon, .material-icon, .progress-icon {
-  font-size: 24px;
-  margin-bottom: 8px;
-  display: block;
+/* モバイル対応 */
+@media (max-width: 480px) {
+  .category-cards {
+    gap: 6px;
+  }
+  
+  .category-card {
+    padding: 6px 3px;
+  }
+  
+  .category-icon {
+    font-size: 18px;
+    margin-bottom: 3px;
+  }
+  
+  .category-name {
+    font-size: 0.7rem;
+  }
+  
+  .material-card, .progress-card {
+    padding: 10px 6px;
+  }
+  
+  .material-icon, .progress-icon {
+    font-size: 20px;
+    margin-bottom: 6px;
+  }
+  
+  .material-name, .progress-name {
+    font-size: 0.75rem;
+  }
+  
+  .route-buttons-container {
+    gap: 6px;
+  }
+  
+  .route-btn {
+    padding: 6px 3px;
+    font-size: 0.8rem;
+    height: 44px;
+  }
 }
 
-.category-name, .material-name, .progress-name {
-  font-size: 0.8rem;
-  font-weight: 500;
-  line-height: 1.2;
+/* アニメーション */
+@keyframes cardPop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-step {
+  animation: slideIn 0.3s ease;
 }
 
 /* コメント入力フォーム */
@@ -586,48 +694,4 @@ footer {
   border-color: var(--primary-color);
   outline: none;
   box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 480px) {
-  .category-cards, .material-cards, .progress-cards {
-    gap: 8px;
-  }
-  
-  .category-card, .material-card, .progress-card {
-    padding: 12px 6px;
-  }
-  
-  .category-icon, .material-icon, .progress-icon {
-    font-size: 20px;
-    margin-bottom: 4px;
-  }
-  
-  .category-card span:not(.category-icon), 
-  .material-card span:not(.material-icon),
-  .progress-card span:not(.progress-icon) {
-    font-size: 0.9rem;
-  }
-}
-
-/* アニメーション */
-@keyframes cardPop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.form-step {
-  animation: slideIn 0.3s ease;
 } 
