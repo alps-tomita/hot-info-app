@@ -10,6 +10,7 @@
   <link rel="icon" href="images/icon-temp.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="images/icon-temp.svg">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.js"></script>
 </head>
 <body>
   <div class="app-container">
@@ -61,10 +62,28 @@
           <img id="preview-image" src="" alt="プレビュー">
         </div>
         
-        <!-- ステップ1: カテゴリー選択 -->
-        <div class="form-step" id="category-step">
+        <!-- ステップ1: 位置情報入力 -->
+        <div class="form-step" id="location-step">
           <div class="step-header">
             <button type="button" id="back-to-route-btn" class="secondary-btn">← ルート選択に戻る</button>
+            <h2>位置情報を入力してください</h2>
+          </div>
+          <div class="location-info">
+            <p id="location-text">位置情報: 取得中...</p>
+          </div>
+          <div class="form-group">
+            <label for="location-detail">場所の補足情報</label>
+            <input type="text" id="location-detail" class="form-control" placeholder="例：〇〇ビル1F、△△商店街の入り口付近">
+          </div>
+          <div class="form-actions">
+            <button type="button" id="next-to-category-btn" class="primary-btn">次へ</button>
+          </div>
+        </div>
+        
+        <!-- ステップ2: カテゴリー選択 -->
+        <div class="form-step" id="category-step" style="display: none;">
+          <div class="step-header">
+            <button type="button" id="back-to-location-btn" class="secondary-btn">← 戻る</button>
             <h2>カテゴリを選択してください</h2>
           </div>
           <div class="category-cards">
@@ -119,14 +138,71 @@
           </div>
         </div>
 
-        <!-- ステップ2: コメント入力 -->
+        <!-- ステップ3: 資料配布状況 -->
+        <div class="form-step" id="material-step" style="display: none;">
+          <div class="step-header">
+            <button type="button" id="back-to-category-btn" class="secondary-btn">← 戻る</button>
+            <h2>資料配布状況を選択してください</h2>
+          </div>
+          <div class="material-cards">
+            <div class="material-card" data-material="名刺配布のみ">
+              <span class="material-icon">📇</span>
+              <span>名刺配布のみ</span>
+            </div>
+            <div class="material-card" data-material="パンフレット配布のみ">
+              <span class="material-icon">📰</span>
+              <span>パンフレット配布のみ</span>
+            </div>
+            <div class="material-card" data-material="名刺・パンフレット配布">
+              <span class="material-icon">📑</span>
+              <span>名刺・パンフレット配布</span>
+            </div>
+            <div class="material-card" data-material="配布なし">
+              <span class="material-icon">❌</span>
+              <span>配布なし</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ステップ4: 工事進捗状況 -->
+        <div class="form-step" id="progress-step" style="display: none;">
+          <div class="step-header">
+            <button type="button" id="back-to-material-btn" class="secondary-btn">← 戻る</button>
+            <h2>工事進捗状況を選択してください</h2>
+          </div>
+          <div class="progress-cards">
+            <div class="progress-card" data-progress="内装工事中（初期段階）">
+              <span class="progress-icon">🏗️</span>
+              <span>内装工事中<br>（初期段階）</span>
+            </div>
+            <div class="progress-card" data-progress="内装工事中（近日終了？）">
+              <span class="progress-icon">🔨</span>
+              <span>内装工事中<br>（近日終了？）</span>
+            </div>
+            <div class="progress-card" data-progress="外装完了">
+              <span class="progress-icon">🏢</span>
+              <span>外装完了</span>
+            </div>
+            <div class="progress-card" data-progress="オープン間近">
+              <span class="progress-icon">✨</span>
+              <span>オープン間近</span>
+            </div>
+            <div class="progress-card" data-progress="解体中">
+              <span class="progress-icon">🚧</span>
+              <span>解体中</span>
+            </div>
+            <div class="progress-card" data-progress="不明">
+              <span class="progress-icon">❓</span>
+              <span>不明</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ステップ5: コメント入力 -->
         <div class="form-step" id="comment-step" style="display: none;">
           <h2>コメントを入力してください</h2>
           <div class="form-group">
-            <textarea id="comment-input" class="form-control" rows="3" placeholder="例：新しいカフェがオープンしました"></textarea>
-          </div>
-          <div class="location-info">
-            <p id="location-text">位置情報: 取得中...</p>
+            <textarea id="comment-input" class="form-control" rows="3" placeholder="例：工事の人に資料配布しました"></textarea>
           </div>
           <div class="form-actions">
             <button type="button" id="submit-btn" class="primary-btn">送信する</button>
