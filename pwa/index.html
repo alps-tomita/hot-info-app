@@ -3,10 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="飲食店営業情報を簡単に送信するためのPWAアプリ">
   <meta name="theme-color" content="#4285f4">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="HOT情報">
+  <link rel="apple-touch-icon" href="images/icon-192x192.png">
+  <link rel="manifest" href="manifest.json">
   <title>HOT情報送信アプリ</title>
   <link rel="stylesheet" href="styles.css">
-  <link rel="manifest" href="manifest.json">
   <link rel="icon" href="images/icon-temp.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="images/icon-temp.svg">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -14,6 +20,10 @@
 </head>
 <body>
   <div class="app-container">
+    <header class="app-header">
+      <h1>HOT情報</h1>
+      <button id="install-button" style="display: none;">アプリをインストール</button>
+    </header>
     <!-- オフラインメッセージ -->
     <div id="offline-message" style="display: none;">
       <p>インターネット接続がありません。情報はオフラインで保存され、接続時に送信されます。</p>
@@ -71,7 +81,14 @@
             <h2>位置情報を入力してください</h2>
           </div>
           <div class="location-info">
-            <p id="location-text">位置情報: 取得中...</p>
+            <div class="form-group">
+              <label>位置情報（緯度, 経度）</label>
+              <div id="location-coords" class="location-detail-box"></div>
+            </div>
+            <div class="form-group">
+              <label for="location-address">住所</label>
+              <input type="text" id="location-address" class="form-control" placeholder="住所を取得中...">
+            </div>
           </div>
           <div class="form-group">
             <label for="location-detail">場所の補足情報</label>

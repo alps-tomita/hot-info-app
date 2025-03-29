@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>HOT情報アプリ アイコン生成ツール</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .icon-preview {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+    button {
+      padding: 10px;
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    canvas {
+      border: 1px solid #eee;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>HOT情報アプリ アイコン生成ツール</h1>
+    <p>以下のボタンをクリックすると、異なるサイズのアイコンを生成・ダウンロードできます。</p>
+    
+    <!-- SVGソース -->
+    <div>
+      <h2>SVGソース</h2>
+      <img id="svg-source" src="images/icon-temp.svg" width="128" height="128" />
+    </div>
+    
+    <!-- アイコン生成ボタン -->
+    <div>
+      <button onclick="generateIcons()">アイコンを生成する</button>
+    </div>
+    
+    <!-- プレビュー領域 -->
+    <div class="preview" id="preview-container">
+      <!-- ここにプレビューが表示されます -->
+    </div>
+  </div>
+  
+  <script>
+    // アイコンサイズ定義
+    const iconSizes = [16, 32, 48, 72, 96, 128, 144, 192, 256, 384, 512];
+    
+    // アイコン生成関数
+    async function generateIcons() {
+      const svgImage = document.getElementById('svg-source');
+      const previewContainer = document.getElementById('preview-container');
+      
+      // プレビューエリアをクリア
+      previewContainer.innerHTML = '';
+      
+      // 各サイズでアイコンを生成
+      for (const size of iconSizes) {
+        // コンテナ作成
+        const container = document.createElement('div');
+        container.className = 'icon-preview';
+        
+        // キャンバス作成
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        
+        // SVG描画
+        ctx.drawImage(svgImage, 0, 0, size, size);
+        
+        // ダウンロードリンク
+        const downloadLink = document.createElement('a');
+        downloadLink.href = canvas.toDataURL('image/png');
+        downloadLink.download = `icon-${size}x${size}.png`;
+        downloadLink.textContent = `${size}x${size} 保存`;
+        downloadLink.style.display = 'block';
+        downloadLink.style.marginTop = '5px';
+        
+        // プレビューを追加
+        container.appendChild(canvas);
+        container.appendChild(downloadLink);
+        previewContainer.appendChild(container);
+      }
+    }
+  </script>
+</body>
+</html> 

@@ -3,132 +3,155 @@
  * Service Worker
  */
 
-// キャッシュ名
-const CACHE_NAME = 'hot-info-cache-v1.0.6';
+// キャッシュの名前とバージョン
+const CACHE_NAME = 'hot-info-cache-v1';
 const API_CACHE_NAME = 'hot-info-api-cache-v1.0.6';
 
-// キャッシュするリソース
-const CACHE_ASSETS = [
+// キャッシュするリソースのリスト
+const CACHE_URLS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
   './manifest.json',
-  './images/icon-temp.svg'
+  './images/icon-temp.svg',
+  // 必要に応じてその他のリソースをここに追加
 ];
 
-// Service Workerのインストール時
+// Service Workerのインストール処理
 self.addEventListener('install', event => {
   console.log('Service Worker: インストール中');
   
-  // キャッシュの準備
+  // キャッシュの初期化と指定したリソースのキャッシュ
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Service Worker: キャッシュにファイルを追加');
-        return cache.addAll(CACHE_ASSETS);
+        console.log('Service Worker: キャッシュを開きました');
+        return cache.addAll(CACHE_URLS);
       })
-      .then(() => self.skipWaiting())
+      .then(() => {
+        // すぐにアクティベーションフェーズに移行
+        return self.skipWaiting();
+      })
   );
 });
 
-// Service Workerのアクティブ化時
+// アクティベーション時の処理
 self.addEventListener('activate', event => {
-  console.log('Service Worker: アクティブ化');
+  console.log('Service Worker: アクティベーション');
   
   // 古いキャッシュの削除
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map(cache => {
-          if (cache !== CACHE_NAME && cache !== API_CACHE_NAME) {
-            console.log('Service Worker: 古いキャッシュを削除', cache);
-            return caches.delete(cache);
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME && cacheName !== API_CACHE_NAME) {
+            console.log('Service Worker: 古いキャッシュを削除', cacheName);
+            return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      // 新しいService Workerを直ちにアクティブ化
+      return self.clients.claim();
     })
   );
-  
-  return self.clients.claim();
 });
 
-// フェッチイベント
+// フェッチイベントの処理（ネットワークリクエスト）
 self.addEventListener('fetch', event => {
-  console.log('Service Worker: フェッチリクエスト', event.request.url);
+  console.log('Service Worker: フェッチ', event.request.url);
   
-  // APIリクエストの処理（ルート一覧取得など）
-  if (event.request.url.includes('script.google.com')) {
-    // APIリクエストはネットワーク優先、その後キャッシュ
-    console.log('Service Worker: APIリクエスト検出', event.request.url);
-    
-    // ルート一覧のAPIリクエスト
-    if (event.request.url.includes('requestType=routes')) {
-      // CORSリクエストをそのまま転送（処理せず）
-      return;
-    } else {
-      // その他のAPIリクエスト（データ送信など）
-      // これはキャッシュせず、常にネットワークを試みる
-      return;
-    }
-  } else {
-    // 静的アセットリクエストはキャッシュファースト戦略を適用
-    event.respondWith(
-      caches.match(event.request)
-        .then(response => {
-          // キャッシュが見つかった場合はそれを返す
-          if (response) {
-            console.log('Service Worker: キャッシュから返送', event.request.url);
-            return response;
-          }
-          
-          // キャッシュが見つからなかった場合はネットワークリクエスト
-          console.log('Service Worker: キャッシュが見つからないのでネットワークリクエスト', event.request.url);
-          return fetch(event.request)
-            .then(res => {
-              // レスポンスをクローン（1回しか読めないため）
-              const resClone = res.clone();
-              
-              // キャッシュを開いて結果を保存
-              caches.open(CACHE_NAME)
-                .then(cache => {
-                  cache.put(event.request, resClone);
-                });
-                
-              return res;
-            })
-            .catch(err => {
-              console.error('Service Worker: フェッチエラー', err);
-              
-              // オフラインフォールバック（特定のリクエストの場合）
-              if (event.request.url.endsWith('.html')) {
-                return caches.match('./index.html');
-              }
-            });
-        })
-    );
+  // POSTリクエストはキャッシュせずにネットワークに直接渡す
+  if (event.request.method === 'POST') {
+    return;
   }
+  
+  // Google Apps ScriptへのGETリクエストもキャッシュしない
+  if (event.request.url.includes('script.google.com')) {
+    return;
+  }
+  
+  // スタティックアセットのキャッシュ戦略
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        // キャッシュに存在すればそれを返す
+        if (response) {
+          console.log('Service Worker: キャッシュからレスポンス', event.request.url);
+          return response;
+        }
+        
+        // アイコンのリクエストで、ファイルが存在しない場合は代替アイコンを提供
+        if (event.request.url.includes('icon-192x192.png') || 
+            event.request.url.includes('icon-512x512.png')) {
+          // SVGアイコンをフォールバックとして使用
+          return caches.match('./images/icon-temp.svg')
+            .then(svgResponse => {
+              if (svgResponse) {
+                console.log('Service Worker: 代替アイコンを提供', event.request.url);
+                return svgResponse;
+              }
+              // SVGも見つからない場合はネットワークリクエストを続行
+              return fetchAndCache(event.request);
+            });
+        }
+        
+        // キャッシュになければネットワークにフェッチ
+        return fetchAndCache(event.request);
+      })
+  );
 });
 
-// オフラインデータキュー（データ送信用）
-let offlineDataQueue = [];
+// フェッチしてキャッシュする関数
+function fetchAndCache(request) {
+  console.log('Service Worker: ネットワークからフェッチ', request.url);
+  return fetch(request)
+    .then(networkResponse => {
+      // レスポンスが有効かチェック
+      if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+        return networkResponse;
+      }
+      
+      // レスポンスをクローンしてキャッシュに保存
+      // （レスポンスは一度しか使用できないため）
+      const responseToCache = networkResponse.clone();
+      caches.open(CACHE_NAME)
+        .then(cache => {
+          cache.put(request, responseToCache);
+        });
+        
+      return networkResponse;
+    })
+    .catch(error => {
+      console.error('Service Worker: フェッチに失敗', error);
+      
+      // 画像リクエストの場合は代替画像を返す
+      if (request.url.includes('.png') || 
+          request.url.includes('.jpg') || 
+          request.url.includes('.jpeg') || 
+          request.url.includes('.svg')) {
+        return caches.match('./images/icon-temp.svg');
+      }
+      
+      // オフライン時や通信エラー時にフォールバックコンテンツを表示
+      return caches.match('./index.html');
+    });
+}
 
 // バックグラウンド同期
 self.addEventListener('sync', event => {
-  console.log('Service Worker: バックグラウンド同期', event.tag);
-  
-  if (event.tag === 'sync-hot-data') {
-    event.waitUntil(syncHotData());
+  if (event.tag === 'send-data') {
+    console.log('Service Worker: バックグラウンド同期 - 送信データ');
+    event.waitUntil(sendPendingData());
   }
 });
 
-// HOTデータの同期処理
-async function syncHotData() {
-  // IndexedDBからオフラインデータを取得して送信する処理
-  // 実際の実装はまだ含まれていません
-  console.log('Service Worker: HOTデータ同期処理を実行');
-  
-  return true;
+// オフラインデータの送信処理
+async function sendPendingData() {
+  // オフラインキュー（IndexedDBなど）から未送信データを取得して送信
+  // 実装はアプリの設計に依存します
+  console.log('Service Worker: 未送信データの処理');
 }
 
 // プッシュ通知

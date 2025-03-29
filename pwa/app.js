@@ -22,9 +22,15 @@ let mediaStream = null;
 let videoElement = null;
 let canvasElement = null;
 
+// PWAのインストールプロンプト処理
+let deferredPrompt;
+
+// 開発モードフラグ - 本番環境では false に変更
+const isDevelopment = false;
+
 // キャッシュをクリアする関数
 function clearCaches() {
-  if ('caches' in window) {
+  if ('caches' in window && isDevelopment) {
     console.log('ServiceWorkerのキャッシュをクリア中...');
     caches.keys().then(cacheNames => {
       cacheNames.forEach(cacheName => {
@@ -37,7 +43,7 @@ function clearCaches() {
 
 // ServiceWorkerの登録解除
 function unregisterServiceWorker() {
-  if ('serviceWorker' in navigator) {
+  if ('serviceWorker' in navigator && isDevelopment) {
     navigator.serviceWorker.getRegistrations().then(registrations => {
       for(let registration of registrations) {
         console.log('ServiceWorkerの登録を解除: ', registration);
@@ -47,9 +53,11 @@ function unregisterServiceWorker() {
   }
 }
 
-// 起動時にキャッシュクリア
-clearCaches();
-unregisterServiceWorker();
+// 開発モードの場合のみキャッシュクリア
+if (isDevelopment) {
+  clearCaches();
+  unregisterServiceWorker();
+}
 
 // DOMが読み込まれた後に実行
 document.addEventListener('DOMContentLoaded', () => {
@@ -669,6 +677,88 @@ document.addEventListener('DOMContentLoaded', () => {
     alert(errorMessage);
     showRouteSelection();
   }
+
+  // インストール状態を確認して、インストールボタンの表示/非表示を切り替える関数
+  function checkInstallState() {
+    const installButton = document.getElementById('install-button');
+    if (!installButton) return;
+    
+    // PWAとして実行されているか確認（スタンドアロンモードまたはiOSのホーム画面から起動）
+    if (window.matchMedia('(display-mode: standalone)').matches || 
+        window.navigator.standalone === true) {
+      // インストール済みの場合はボタンを非表示
+      installButton.style.display = 'none';
+      console.log('PWAモードで実行中 - インストールボタンを非表示');
+    } else {
+      // インストールプロンプトが利用可能な場合のみボタンを表示（初期状態は非表示）
+      installButton.style.display = 'none';
+      console.log('ブラウザモードで実行中 - インストールプロンプトを待機');
+    }
+  }
+
+  // インストールプロンプトをキャッチ
+  window.addEventListener('beforeinstallprompt', (e) => {
+    // プロンプトをすぐに表示しないためにデフォルトの動作を防止
+    e.preventDefault();
+    // 後で使用するためにイベントを保存
+    deferredPrompt = e;
+    
+    // インストールボタンがあれば表示する
+    const installButton = document.getElementById('install-button');
+    if (installButton) {
+      // ブラウザモードで実行中かつプロンプトが利用可能な場合のみボタンを表示
+      if (!window.matchMedia('(display-mode: standalone)').matches && 
+          window.navigator.standalone !== true) {
+        installButton.style.display = 'block';
+        console.log('インストールプロンプトが利用可能 - インストールボタンを表示');
+      }
+      
+      // インストールボタンのクリックイベント
+      installButton.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        
+        // プロンプトを表示
+        deferredPrompt.prompt();
+        
+        // ユーザーの選択を待つ
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`ユーザーの選択: ${outcome}`);
+        
+        // deferredPromptをリセット（一度しか使えない）
+        deferredPrompt = null;
+        
+        // ボタンを非表示
+        installButton.style.display = 'none';
+      });
+    }
+  });
+
+  // PWAが正常にインストールされたかを追跡
+  window.addEventListener('appinstalled', (evt) => {
+    console.log('インストール成功');
+    // インストール後はボタンを非表示
+    const installButton = document.getElementById('install-button');
+    if (installButton) {
+      installButton.style.display = 'none';
+    }
+  });
+
+  // アプリケーションバージョン
+  const appVersion = '1.0.0';
+
+  // Webアプリが読み込まれたときの処理
+  console.log(`HOT情報アプリ バージョン ${appVersion} を起動中...`);
+  
+  // PWAとして実行されているか確認
+  if (window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true) {
+    console.log('PWAモードで実行中');
+  } else {
+    console.log('ブラウザモードで実行中');
+  }
+  
+  // インストール状態を確認
+  checkInstallState();
 });
 
 /**
