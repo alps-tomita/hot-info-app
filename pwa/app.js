@@ -5,7 +5,7 @@
 
 // グローバル変数
 // 正常に動作確認済みのAPIエンドポイントURL
-const API_URL = 'https://script.google.com/macros/s/AKfycbyINLICWDQlAMJtMtnZnDQFlqXdbacKM4VBJXdETeT28o-dMUXd7HfUNDwV4E6zt-Di/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxHkHnbyCfL0QDxRZbqaXn4n0vByyNtVgbfALvMwH_H3crad-7nVhiX7Qrk0cztGuDL/exec';
 let selectedRoute = '';
 let capturedImage = null;
 let latitude = null;
@@ -448,8 +448,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const constraints = {
         video: {
           facingMode: 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         },
         audio: false
       };
