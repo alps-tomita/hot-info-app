@@ -305,8 +305,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // フォームをリセット
     document.getElementById('comment-input').value = '';
     document.getElementById('preview-image').src = '';
+    
+    // すべての選択状態をリセット
     capturedImage = null;
     selectedCategory = null;
+    selectedMaterial = null;
+    selectedProgress = null;
+    
+    // カード選択の視覚的な状態をリセット
+    document.querySelectorAll('.category-card.selected, .material-card.selected, .progress-card.selected').forEach(card => {
+      card.classList.remove('selected');
+    });
     
     // 画面を初期状態に戻す
     document.querySelector('.complete-container').style.display = 'none';
