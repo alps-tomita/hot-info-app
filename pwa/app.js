@@ -263,14 +263,13 @@ document.addEventListener('DOMContentLoaded', () => {
         route: selectedRoute,
         category: selectedCategory,
         material: selectedMaterial,
-        progress: selectedProgress,  // 工事進捗状況を追加
-        comment: comment || '', // 空の場合は空文字列を設定
-        image: capturedImage,
-        locationDetail: locationDetail,
-        ...(capturedImage && {
+        progress: selectedProgress,
+        comment: comment || '',
+        imageUrl: capturedImage,
+        address: locationDetail,
+        ...(latitude !== null && longitude !== null && {
           latitude: latitude,
-          longitude: longitude,
-          locationAddress: locationAddress
+          longitude: longitude
         })
       };
 
