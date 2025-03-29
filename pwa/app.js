@@ -83,20 +83,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // イベントリスナー：カメラ起動ボタン
   startCameraBtn.addEventListener('click', () => {
     console.log('カメラ起動ボタンがクリックされました。ルート：', selectedRoute);
-    // 選択状態のカードをすべて非選択状態に戻す
-    document.querySelectorAll('.category-card.selected, .material-card.selected, .progress-card.selected').forEach(card => {
-      card.classList.remove('selected');
-    });
+    resetAllCardSelections();
     startCamera();
   });
 
   // イベントリスナー：写真なしで送信ボタン
   document.getElementById('no-photo-btn')?.addEventListener('click', () => {
     console.log('写真なしで送信が選択されました。ルート：', selectedRoute);
-    // 選択状態のカードをすべて非選択状態に戻す
-    document.querySelectorAll('.category-card.selected, .material-card.selected, .progress-card.selected').forEach(card => {
-      card.classList.remove('selected');
-    });
+    resetAllCardSelections();
     
     routeSelectionContainer.style.display = 'none';
     infoFormContainer.style.display = 'block';
@@ -128,12 +122,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showMaterialStep() {
-    // 資料配布状況カードをリセット
-    document.querySelectorAll('.material-card.selected').forEach(card => {
-      card.classList.remove('selected');
-    });
-    selectedMaterial = null;
-    
     document.getElementById('location-step').style.display = 'none';
     document.getElementById('category-step').style.display = 'none';
     document.getElementById('material-step').style.display = 'block';
@@ -142,12 +130,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showProgressStep() {
-    // 工事進捗状況カードをリセット
-    document.querySelectorAll('.progress-card.selected').forEach(card => {
-      card.classList.remove('selected');
-    });
-    selectedProgress = null;
-    
     document.getElementById('location-step').style.display = 'none';
     document.getElementById('category-step').style.display = 'none';
     document.getElementById('material-step').style.display = 'none';
@@ -163,6 +145,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('comment-step').style.display = 'block';
   }
 
+  // 全てのカードの選択をリセットする関数
+  function resetAllCardSelections() {
+    document.querySelectorAll('.category-card').forEach(card => card.classList.remove('selected'));
+    document.querySelectorAll('.material-card').forEach(card => card.classList.remove('selected'));
+    document.querySelectorAll('.progress-card').forEach(card => card.classList.remove('selected'));
+    
+    selectedCategory = null;
+    selectedMaterial = null;
+    selectedProgress = null;
+  }
+
   // 位置情報入力から次へボタンのイベントリスナー
   document.getElementById('next-to-category-btn').addEventListener('click', () => {
     // 位置情報の有無に関わらず次のステップに進めるように修正
@@ -172,34 +165,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // カテゴリー選択の戻るボタンのイベントリスナー
   document.getElementById('back-to-location-btn')?.addEventListener('click', () => {
-    // カテゴリーカードの選択状態をリセット
-    document.querySelectorAll('.category-card.selected').forEach(card => {
-      card.classList.remove('selected');
-    });
+    document.querySelectorAll('.category-card').forEach(card => card.classList.remove('selected'));
     selectedCategory = null;
-    
     showLocationStep();
   });
 
   // 資料配布状況の戻るボタンのイベントリスナー
   document.getElementById('back-to-category-btn')?.addEventListener('click', () => {
-    // 資料配布状況カードの選択状態をリセット
-    document.querySelectorAll('.material-card.selected').forEach(card => {
-      card.classList.remove('selected');
-    });
+    document.querySelectorAll('.material-card').forEach(card => card.classList.remove('selected'));
     selectedMaterial = null;
-    
     showCategoryStep();
   });
 
   // 工事進捗状況の戻るボタンのイベントリスナー
   document.getElementById('back-to-material-btn')?.addEventListener('click', () => {
-    // 工事進捗状況カードの選択状態をリセット
-    document.querySelectorAll('.progress-card.selected').forEach(card => {
-      card.classList.remove('selected');
-    });
+    document.querySelectorAll('.progress-card').forEach(card => card.classList.remove('selected'));
     selectedProgress = null;
-    
     showMaterialStep();
   });
 
@@ -257,13 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('comment-input').value = '';
     document.getElementById('preview-image').src = '';
     
-    // すべてのカードの選択状態をリセット
-    document.querySelectorAll('.category-card.selected, .material-card.selected, .progress-card.selected').forEach(card => {
-      card.classList.remove('selected');
-    });
-    selectedCategory = null;
-    selectedMaterial = null;
-    selectedProgress = null;
+    resetAllCardSelections();
     
     // 画面を初期状態に戻す
     document.querySelector('.complete-container').style.display = 'none';
@@ -613,16 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
    * ルート選択画面を表示する関数
    */
   function showRouteSelection() {
-    // すべてのカードの選択状態をリセット
-    document.querySelectorAll('.category-card.selected, .material-card.selected, .progress-card.selected').forEach(card => {
-      card.classList.remove('selected');
-    });
-    
-    // 変数をリセット
-    capturedImage = null;
-    selectedCategory = null;
-    selectedMaterial = null;
-    selectedProgress = null;
+    resetAllCardSelections();
     
     // 画面表示を切り替え
     routeSelectionContainer.style.display = 'block';
@@ -736,17 +702,69 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('preview-image').src = '';
     document.getElementById('location-detail').value = '';
     
-    // すべてのカードの選択状態をリセット
-    document.querySelectorAll('.category-card.selected, .material-card.selected, .progress-card.selected').forEach(card => {
-      card.classList.remove('selected');
-    });
-    selectedCategory = null;
-    selectedMaterial = null;
-    selectedProgress = null;
+    resetAllCardSelections();
     
     // ルート選択画面に戻る
     infoFormContainer.style.display = 'none';
     routeSelectionContainer.style.display = 'block';
+  });
+
+  // カード選択のイベントリスナーをDOMContentLoadedイベント内で直接設定
+  // カテゴリーカードのイベントリスナー
+  document.querySelectorAll('.category-card').forEach(card => {
+    card.addEventListener('click', function() {
+      console.log('カテゴリーがクリックされました:', this.dataset.category);
+      
+      // すべてのカテゴリーカードの選択状態をリセット
+      document.querySelectorAll('.category-card').forEach(c => c.classList.remove('selected'));
+      
+      // このカードを選択状態に
+      this.classList.add('selected');
+      selectedCategory = this.dataset.category;
+      
+      // 次のステップへ
+      setTimeout(() => {
+        showMaterialStep();
+      }, 300);
+    });
+  });
+  
+  // 資料配布状況カードのイベントリスナー
+  document.querySelectorAll('.material-card').forEach(card => {
+    card.addEventListener('click', function() {
+      console.log('資料配布状況がクリックされました:', this.dataset.material);
+      
+      // すべての資料配布状況カードの選択状態をリセット
+      document.querySelectorAll('.material-card').forEach(c => c.classList.remove('selected'));
+      
+      // このカードを選択状態に
+      this.classList.add('selected');
+      selectedMaterial = this.dataset.material;
+      
+      // 次のステップへ
+      setTimeout(() => {
+        showProgressStep();
+      }, 300);
+    });
+  });
+  
+  // 工事進捗状況カードのイベントリスナー
+  document.querySelectorAll('.progress-card').forEach(card => {
+    card.addEventListener('click', function() {
+      console.log('工事進捗状況がクリックされました:', this.dataset.progress);
+      
+      // すべての工事進捗状況カードの選択状態をリセット
+      document.querySelectorAll('.progress-card').forEach(c => c.classList.remove('selected'));
+      
+      // このカードを選択状態に
+      this.classList.add('selected');
+      selectedProgress = this.dataset.progress;
+      
+      // 次のステップへ
+      setTimeout(() => {
+        showCommentStep();
+      }, 300);
+    });
   });
 });
 
