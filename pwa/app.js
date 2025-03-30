@@ -89,18 +89,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // イベントリスナー：写真なしで送信ボタン
   document.getElementById('no-photo-btn')?.addEventListener('click', () => {
-    console.log('写真なしで送信が選択されました。ルート：', selectedRoute);
-    resetAllCardSelections();
+    // 写真なしの場合はcapturedImageをnullにセット
+    capturedImage = null;
     
-    routeSelectionContainer.style.display = 'none';
+    // 位置情報入力ステップを表示
+    cameraContainer.style.display = 'none';
     infoFormContainer.style.display = 'block';
-    
-    // 位置情報フィールドを初期化
-    document.getElementById('location-coords').textContent = '位置情報：未取得（手動入力可）';
-    document.getElementById('location-address').value = '';
-    document.getElementById('location-address').placeholder = '住所を入力してください';
-    
-    // 位置情報ステップを表示
     showLocationStep();
   });
 
@@ -827,74 +821,76 @@ async function getLocation() {
   });
 }
 
-// フォームデータを取得する関数
+// 送信するフォームデータを取得する関数
 function getFormData() {
-  const locationCoordsText = document.getElementById('location-coords').textContent;
-  const locationAddress = document.getElementById('location-address').value;
-  const locationDetail = document.getElementById('location-detail').value;
+  const selectedRoute = localStorage.getItem('selectedRoute') || '';
+  const category = selectedCategory;
+  const material = selectedMaterial;
+  const progress = selectedProgress;
+  const comment = document.getElementById('comment-input').value;
   
-  let latitude = null;
-  let longitude = null;
+  // 位置情報を取得
+  const latitude = document.getElementById('latitude').value;
+  const longitude = document.getElementById('longitude').value;
+  const address = document.getElementById('address').value;
   
-  // 位置情報の解析
-  const coordsMatch = locationCoordsText.match(/緯度: ([\d.-]+), 経度: ([\d.-]+)/);
-  if (coordsMatch) {
-    latitude = parseFloat(coordsMatch[1]);
-    longitude = parseFloat(coordsMatch[2]);
-  }
-  
+  // フォームデータを返す
   return {
-    latitude,
-    longitude,
-    address: locationAddress,
-    detail: locationDetail
+    route: selectedRoute,
+    latitude: latitude,
+    longitude: longitude,
+    address: address,
+    category: category,
+    comment: comment,
+    imageUrl: '', // GAS側で設定されるためここでは空文字
+    imageData: capturedImage, // 撮影した画像のBase64データ
+    material: material,
+    progress: progress
   };
 }
 
 /**
- * データを送信する関数
+ * データをサーバーに送信する関数
  */
-function sendData(data) {
-  console.log('データ送信を開始します:', data);
-  
-  // 位置情報がある場合のみ含める（必須ではない）
-  if (latitude !== null && longitude !== null) {
-    data.latitude = latitude;
-    data.longitude = longitude;
-  }
-  
-  // 住所情報も追加（入力された場合のみ）
-  const addressInput = document.getElementById('location-address');
-  if (addressInput && addressInput.value.trim() !== '') {
-    data.address = addressInput.value.trim();
-  }
-  
-  // 補足情報も追加（入力された場合のみ）
-  const detailInput = document.getElementById('location-detail');
-  if (detailInput && detailInput.value.trim() !== '') {
-    data.detail = detailInput.value.trim();
-  }
-
-  // no-corsモードで送信
-  return fetch(API_URL, {
-    method: 'POST',
-    mode: 'no-cors',  // CORS制限を回避
-    cache: 'no-cache',
-    credentials: 'omit',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(data)
-  })
-  .then(response => {
-    console.log('送信レスポンス:', response);
+async function sendData(data) {
+  try {
+    showLoading('送信中...');
     
-    // no-corsモードではレスポンスの詳細が取得できないため、
-    // ステータスコードに関わらず成功とみなす
-    return { status: "ok", message: "データが送信されました" };
-  })
-  .catch(error => {
+    const endpoint = 'https://script.google.com/macros/s/AKfycbxh6QpUg0ZnBjYw9rsC42kAFopFXg-xdoBTaJvKdh_C9F30I5lQx8uSEKqF-aAbXB7d/exec';
+    
+    console.log('送信データ:', data);
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('送信結果:', result);
+    
+    hideLoading();
+    
+    if (result.result === 'success') {
+      alert('情報が正常に送信されました！');
+      resetForm();
+      showRouteSelection();
+    } else {
+      alert('送信に失敗しました: ' + (result.message || '不明なエラー'));
+    }
+  } catch (error) {
+    hideLoading();
     console.error('送信エラー:', error);
-    throw error;
-  });
+    alert('送信に失敗しました。インターネット接続を確認してください。');
+    
+    // オフライン時の対応（今後実装予定）
+    // saveDataForLater(data);
+  }
 } 

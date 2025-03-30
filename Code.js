@@ -133,6 +133,22 @@ function doPost(e) {
     const params = JSON.parse(e.postData.contents);
     console.log('POSTリクエスト受信:', JSON.stringify(params));
     
+    // 画像がBase64形式で送信された場合はGoogleドライブに保存
+    let imageUrl = params.imageUrl || "";
+    if (params.imageData) {
+      try {
+        // Base64データから"data:image/jpeg;base64,"などのプレフィックスを取り除く
+        const base64Data = params.imageData.split(',')[1] || params.imageData;
+        // 一意のファイル名を生成（タイムスタンプ＋乱数）
+        const fileName = `HOT_${new Date().getTime()}_${Math.floor(Math.random() * 1000)}.jpg`;
+        // 画像をGoogleドライブに保存
+        imageUrl = saveImageToFolder(base64Data, fileName);
+        console.log('画像保存URL:', imageUrl);
+      } catch (imageError) {
+        console.error('画像保存エラー:', imageError);
+      }
+    }
+    
     // データシート取得
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName("データ受信用");
@@ -145,7 +161,7 @@ function doPost(e) {
       params.longitude || "", // 経度
       params.category || "", // カテゴリ
       params.comment || "",  // コメント
-      params.imageUrl || "", // 画像URL
+      imageUrl,             // 画像URL（保存したURLを使用）
       params.address || "", // 住所
       params.material || "", // 資料配布状況
       params.progress || ""  // 工事進捗状況
@@ -218,13 +234,23 @@ function createCorsJSONResponse(data) {
 // グローバル変数（画像保存用フォルダID）
 const FOLDER_ID = "1rOGg_2inKeXyB-7z27q-Wycs8wM4l5VU"; // HOT情報画像フォルダのID
 
-// 画像処理用関数（今後使用）
+/**
+ * 画像をGoogleドライブに保存する関数
+ * @param {string} base64Image - Base64エンコードされた画像データ
+ * @param {string} fileName - 保存するファイル名
+ * @return {string} 保存された画像の共有URL
+ */
 function saveImageToFolder(base64Image, fileName) {
   try {
     const folder = DriveApp.getFolderById(FOLDER_ID);
     const blob = Utilities.newBlob(Utilities.base64Decode(base64Image), 'image/jpeg', fileName);
     const file = folder.createFile(blob);
-    return file.getUrl();
+    
+    // ファイルを共有設定（誰でも閲覧可能に）
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    
+    // 共有可能なURL形式（手動で成功したのと同じ形式）
+    return `https://drive.google.com/uc?export=view&id=${file.getId()}`;
   } catch (error) {
     console.error("画像保存エラー: " + error.toString());
     return null;
@@ -490,10 +516,30 @@ function prepareManagementData(rowData) {
     locationInfo = `${rowData["緯度"]}, ${rowData["経度"]}`;
   }
   
+  // 画像URLの取得（全角・半角の両方に対応）
+  let imageUrl = null;
+  if (rowData["画像URL"]) {
+    imageUrl = rowData["画像URL"];
+  } else if (rowData["画像ＵＲＬ"]) { // 全角URLをチェック
+    imageUrl = rowData["画像ＵＲＬ"];
+  }
+  
+  // 画像URLの形式を調整（必要に応じて）
+  if (imageUrl && imageUrl.includes("/file/d/")) {
+    // Google DriveのファイルURLを表示用URLに変換
+    const fileIdMatch = imageUrl.match(/\/file\/d\/([^\/]+)/);
+    if (fileIdMatch && fileIdMatch[1]) {
+      const fileId = fileIdMatch[1];
+      imageUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+    }
+  }
+  
   // 写真プレビュー用のIMAGE関数を作成
   let imageFormula = "";
-  if (rowData["画像URL"]) {
-    imageFormula = `=IMAGE("${rowData["画像URL"]}", 2)`; // モード2: セルに合わせて画像をリサイズ
+  if (imageUrl) {
+    // モード1: 実際のサイズで表示
+    imageFormula = `=IMAGE("${imageUrl}", 1)`;
+    console.log("画像数式を生成: " + imageFormula);
   }
   
   // 日時のフォーマット（タイムスタンプがDateオブジェクトかどうかを確認）
@@ -528,33 +574,29 @@ function appendRowToManagementSheet(sheet, data) {
   try {
     // シートの列ヘッダーを取得
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const lastRow = sheet.getLastRow() + 1; // 新しい行の位置
     
-    // 新しい行のデータを準備
-    const newRow = [];
+    // 行単位で一度に値をセットする方法（appendRowを使わない）
+    const rowData = [];
     for (let i = 0; i < headers.length; i++) {
       const header = headers[i];
       
-      // データ取得日時の処理（A列）
-      if (i === 0 && header === "データ取得日時") {
-        newRow.push(data["データ取得日時"]);
-        continue;
-      }
-      
       // 対応するデータがあれば挿入
       if (data[header] !== undefined) {
-        newRow.push(data[header]);
+        rowData.push(data[header]);
       } else {
-        newRow.push("");
+        rowData.push("");
       }
     }
     
-    // 行を追加
-    sheet.appendRow(newRow);
+    // まず通常の値を一括設定
+    const newRange = sheet.getRange(lastRow, 1, 1, headers.length);
+    newRange.setValues([rowData]);
     
-    // 画像数式が含まれる場合、追加した行の数式を設定
-    const lastRow = sheet.getLastRow();
+    // 画像数式を個別に設定
     for (let i = 0; i < headers.length; i++) {
       if (headers[i] === "写真" && data["写真"] && data["写真"].startsWith("=IMAGE")) {
+        console.log(`行${lastRow}、列${i+1}に写真数式を設定: ${data["写真"]}`);
         sheet.getRange(lastRow, i + 1).setFormula(data["写真"]);
       }
     }
@@ -741,11 +783,19 @@ function removeAutoTransferTrigger() {
  */
 function sendChatworkNotification(message) {
   try {
-    // Chatwork APIトークン（実際の値に置き換え必要）
-    const CHATWORK_API_TOKEN = "YOUR_CHATWORK_API_TOKEN";
+    // ※※※ 重要 ※※※
+    // 以下の2つの値を実際のものに書き換えてください
+    // Chatwork APIトークン（Chatworkの設定→APIから取得）
+    const CHATWORK_API_TOKEN = "YOUR_CHATWORK_API_TOKEN"; // ←ここを変更
     
-    // 通知先のチャットルームID（実際の値に置き換え必要）
-    const ROOM_ID = "YOUR_CHATWORK_ROOM_ID";
+    // 通知先のチャットルームID（ルームのURLの末尾の数字）
+    const ROOM_ID = "YOUR_CHATWORK_ROOM_ID"; // ←ここを変更
+    
+    // APIトークンが設定されていない場合はスキップ
+    if (CHATWORK_API_TOKEN === "YOUR_CHATWORK_API_TOKEN") {
+      console.log("Chatwork APIトークンが設定されていないため、通知はスキップされました");
+      return false;
+    }
     
     // APIリクエスト用の設定
     const url = `https://api.chatwork.com/v2/rooms/${ROOM_ID}/messages`;
@@ -801,11 +851,14 @@ function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('HOT情報管理')
     .addItem('新規データを転記', 'transferDataToManagementSheet')
-    .addItem('転記して通知する', 'transferDataAndNotify')
     .addSeparator()
-    .addItem('情報管理シートを初期設定', 'setupManagementSheet')
     .addItem('転記状況を確認', 'checkTransferStatus')
     .addItem('情報を検索', 'searchManagementSheet')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('⚙️ 管理機能')
+      .addItem('情報管理シートの再初期化（注意）', 'setupManagementSheet')
+      .addItem('転記機能の診断実行', 'diagnoseTranfer')
+    )
     .addToUi();
 }
 
@@ -850,40 +903,6 @@ function checkTransferStatus() {
   } catch (error) {
     console.error("転記状況確認エラー: " + error.toString());
     SpreadsheetApp.getUi().alert("エラーが発生しました: " + error.toString());
-  }
-}
-
-/**
- * 編集時のトリガー関数
- * 情報管理シートの行が編集された場合に最終更新日を更新
- */
-function onEdit(e) {
-  try {
-    // 変更が発生したスプレッドシートとシートを取得
-    const sheet = e.source.getActiveSheet();
-    
-    // 情報管理シートの場合のみ処理
-    if (sheet.getName() === "情報管理") {
-      const range = e.range;
-      const row = range.getRow();
-      
-      // ヘッダー行は処理しない
-      if (row <= 1) return;
-      
-      // 対応日カラムのインデックスを取得
-      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      const lastUpdateColIndex = headers.indexOf("対応日") + 1;
-      
-      // 対応日カラムが存在する場合のみ更新
-      if (lastUpdateColIndex > 0) {
-        // 特定のカラムの場合のみ対応日を更新（対応日自体の変更は除外）
-        if (range.getColumn() !== lastUpdateColIndex) {
-          sheet.getRange(row, lastUpdateColIndex).setValue(new Date());
-        }
-      }
-    }
-  } catch (error) {
-    console.error("自動更新処理エラー: " + error.toString());
   }
 }
 
@@ -972,5 +991,201 @@ function searchManagementSheet() {
   } catch (error) {
     console.error("検索エラー: " + error.toString());
     ui.alert('検索中にエラーが発生しました: ' + error.toString());
+  }
+}
+
+/**
+ * 数式設定の診断用関数
+ */
+function testImageFormula() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("情報管理");
+  
+  if (!sheet) {
+    console.error("情報管理シートが見つかりません");
+    return;
+  }
+  
+  // テスト用のURL（手動で動作確認できたもの）
+  const testImageUrl = "https://drive.google.com/uc?export=view&id=1p4NSiA_27rezPR3QeCJYHPuLvwkc3Ms4";
+  
+  // 画像数式
+  const imageFormula = `=IMAGE("${testImageUrl}", 1)`;
+  
+  try {
+    // 最終行の次の行を取得
+    const lastRow = sheet.getLastRow() + 1;
+    
+    // 行を追加（データ取得日時とテスト表示）
+    sheet.getRange(lastRow, 1).setValue(new Date());
+    sheet.getRange(lastRow, 2).setValue("テスト");
+    
+    // 写真列を特定（ヘッダー行から検索）
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    let photoColumn = -1;
+    
+    for (let i = 0; i < headers.length; i++) {
+      if (headers[i] === "写真") {
+        photoColumn = i + 1; // 1ベースのインデックス
+        break;
+      }
+    }
+    
+    if (photoColumn === -1) {
+      console.error("「写真」列が見つかりません");
+      return;
+    }
+    
+    // 写真列に数式を直接設定
+    console.log(`行${lastRow}、列${photoColumn}に数式を設定: ${imageFormula}`);
+    const photoCell = sheet.getRange(lastRow, photoColumn);
+    
+    // 数式を設定
+    photoCell.setFormula(imageFormula);
+    
+    // 設定後の値を確認
+    console.log("数式設定後のセルの値:", photoCell.getFormula());
+    
+    return "テスト行を追加しました。スプレッドシートを確認してください。";
+  } catch (error) {
+    console.error("テスト中にエラーが発生しました:", error);
+    return error.toString();
+  }
+}
+
+/**
+ * 転記処理の診断用関数
+ */
+function diagnoseTranfer() {
+  try {
+    // スプレッドシートを取得
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const receiveSheet = ss.getSheetByName("データ受信用");
+    
+    if (!receiveSheet) {
+      console.error("データ受信用シートが見つかりません");
+      return "データ受信用シートが見つかりません";
+    }
+    
+    // 最新の1件のデータを取得
+    const lastRow = receiveSheet.getLastRow();
+    if (lastRow <= 1) {
+      console.error("データが存在しません");
+      return "データが存在しません";
+    }
+    
+    // 最新行のデータを取得
+    const headers = receiveSheet.getRange(1, 1, 1, receiveSheet.getLastColumn()).getValues()[0];
+    const dataRow = receiveSheet.getRange(lastRow, 1, 1, receiveSheet.getLastColumn()).getValues()[0];
+    
+    // オブジェクトに変換
+    const rowData = {};
+    headers.forEach((header, index) => {
+      if (header) rowData[header] = dataRow[index];
+    });
+    
+    console.log("元データ:", JSON.stringify(rowData));
+    
+    // 画像URLの確認（全角・半角両方対応）
+    let imageUrl = null;
+    if (rowData["画像URL"]) {
+      imageUrl = rowData["画像URL"];
+      console.log("画像URL(半角):", imageUrl);
+    } else if (rowData["画像ＵＲＬ"]) {
+      imageUrl = rowData["画像ＵＲＬ"];
+      console.log("画像URL(全角):", imageUrl);
+    }
+    
+    if (!imageUrl) {
+      console.log("画像URLが設定されていません");
+      return "画像URLが設定されていません";
+    }
+    
+    // Google Drive URL形式の変換
+    if (imageUrl.includes("/file/d/")) {
+      const fileIdMatch = imageUrl.match(/\/file\/d\/([^\/]+)/);
+      if (fileIdMatch && fileIdMatch[1]) {
+        const fileId = fileIdMatch[1];
+        const convertedUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+        console.log("変換されたURL:", convertedUrl);
+        imageUrl = convertedUrl;
+      }
+    }
+    
+    // 手動でIMAGE関数を作成
+    const imageFormula = `=IMAGE("${imageUrl}", 1)`;
+    console.log("生成された画像数式:", imageFormula);
+    
+    // prepareManagementDataで処理
+    const managementData = prepareManagementData(rowData);
+    console.log("変換後データ:", JSON.stringify(managementData));
+    
+    // 写真数式の確認
+    console.log("写真数式(自動生成):", managementData["写真"]);
+    
+    // 情報管理シートに試験的に1行追加
+    const manageSheet = ss.getSheetByName("情報管理");
+    if (!manageSheet) {
+      console.error("情報管理シートが見つかりません");
+      return "情報管理シートが見つかりません";
+    }
+    
+    // 通常の行追加方法
+    const newRow = manageSheet.getLastRow() + 1;
+    console.log(`新規行 ${newRow} に診断データを追加します`);
+    
+    // ヘッダーの取得
+    const manageHeaders = manageSheet.getRange(1, 1, 1, manageSheet.getLastColumn()).getValues()[0];
+    console.log("管理シートヘッダー:", manageHeaders);
+    
+    // 行データの準備
+    const rowValues = [];
+    for (let i = 0; i < manageHeaders.length; i++) {
+      const header = manageHeaders[i];
+      if (managementData[header] !== undefined) {
+        rowValues.push(managementData[header]);
+      } else {
+        rowValues.push("");
+      }
+    }
+    
+    // 写真列のインデックスを特定
+    let photoColIndex = -1;
+    for (let i = 0; i < manageHeaders.length; i++) {
+      if (manageHeaders[i] === "写真") {
+        photoColIndex = i;
+        break;
+      }
+    }
+    
+    if (photoColIndex === -1) {
+      console.error("写真列が見つかりません");
+      return "写真列が見つかりません";
+    }
+    
+    console.log(`写真列は ${photoColIndex + 1} 列目です`);
+    
+    // 行を追加
+    const range = manageSheet.getRange(newRow, 1, 1, manageHeaders.length);
+    range.setValues([rowValues]);
+    
+    // 写真数式を個別に設定（手動生成した方）
+    console.log(`写真数式を設定します: ${imageFormula}`);
+    const photoCell = manageSheet.getRange(newRow, photoColIndex + 1);
+    photoCell.setFormula(imageFormula);
+    
+    // 設定後の確認
+    Utilities.sleep(500); // 少し待機
+    const actualFormula = photoCell.getFormula();
+    console.log(`設定後の数式: ${actualFormula}`);
+    
+    if (actualFormula !== imageFormula) {
+      console.error("数式が正しく設定されていません！");
+    }
+    
+    return "診断完了。ログを確認してください。テスト行が追加されました。";
+  } catch (error) {
+    console.error("診断中にエラーが発生しました:", error);
+    return error.toString();
   }
 } 
