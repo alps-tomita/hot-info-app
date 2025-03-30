@@ -510,10 +510,29 @@ function getSheetDataAsObjects(sheet) {
  * 受信データから情報管理シート用のデータを準備
  */
 function prepareManagementData(rowData) {
-  // 住所データの準備（住所があれば使用、なければ緯度・経度）
+  // 住所データと緯度経度の準備
   let locationInfo = rowData["住所"] || "";
-  if (!locationInfo && rowData["緯度"] && rowData["経度"]) {
-    locationInfo = `${rowData["緯度"]}, ${rowData["経度"]}`;
+  let locationFormula = "";
+  let mapUrl = "";
+  
+  // 緯度・経度の有無を確認
+  const hasCoordinates = rowData["緯度"] && rowData["経度"];
+  
+  // 緯度経度がある場合は、そのURLを優先（表示は住所またはデフォルト）
+  if (hasCoordinates) {
+    // リンク先は常に緯度経度ベースに
+    mapUrl = `https://www.google.com/maps?q=${rowData["緯度"]},${rowData["経度"]}`;
+    
+    // 表示テキストは住所があればそれを使用、なければ緯度経度
+    const displayText = locationInfo || `${rowData["緯度"]}, ${rowData["経度"]}`;
+    locationFormula = `=HYPERLINK("${mapUrl}", "${displayText}")`;
+  }
+  // 住所だけの場合
+  else if (locationInfo) {
+    // 住所をURLエンコード
+    const encodedAddress = encodeURIComponent(locationInfo);
+    mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+    locationFormula = `=HYPERLINK("${mapUrl}", "${locationInfo}")`;
   }
   
   // 画像URLの取得（全角・半角の両方に対応）
@@ -524,21 +543,25 @@ function prepareManagementData(rowData) {
     imageUrl = rowData["画像ＵＲＬ"];
   }
   
-  // 画像URLの形式を調整（必要に応じて）
-  if (imageUrl && imageUrl.includes("/file/d/")) {
-    // Google DriveのファイルURLを表示用URLに変換
-    const fileIdMatch = imageUrl.match(/\/file\/d\/([^\/]+)/);
-    if (fileIdMatch && fileIdMatch[1]) {
-      const fileId = fileIdMatch[1];
-      imageUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
-    }
-  }
-  
   // 写真プレビュー用のIMAGE関数を作成
   let imageFormula = "";
   if (imageUrl) {
-    // モード1: 実際のサイズで表示
-    imageFormula = `=IMAGE("${imageUrl}", 1)`;
+    // Google Drive URL形式の変換
+    let viewUrl = imageUrl; // 表示用URL
+    let originalUrl = imageUrl; // 原寸大表示用URL
+    
+    if (imageUrl.includes("/file/d/")) {
+      // Google DriveのファイルURLを処理
+      const fileIdMatch = imageUrl.match(/\/file\/d\/([^\/]+)/);
+      if (fileIdMatch && fileIdMatch[1]) {
+        const fileId = fileIdMatch[1];
+        viewUrl = `https://drive.google.com/uc?export=view&id=${fileId}`; // サムネイル表示用
+        originalUrl = `https://drive.google.com/file/d/${fileId}/view`; // 原寸大表示用
+      }
+    }
+    
+    // ハイパーリンク付き画像式（クリックで原寸大表示）
+    imageFormula = `=HYPERLINK("${originalUrl}",IMAGE("${viewUrl}", 1))`;
     console.log("画像数式を生成: " + imageFormula);
   }
   
@@ -557,7 +580,7 @@ function prepareManagementData(rowData) {
     "対応メモ": "",
     "対応日": "",
     "ルート名": rowData["ルート名"] || "",
-    "場所": locationInfo,
+    "場所": locationFormula || locationInfo, // ハイパーリンク付きの場所情報または通常のテキスト
     "資料配布状況": rowData["資料配布状況"] || "",
     "工事進捗状況": rowData["工事進捗状況"] || "",
     "カテゴリ": rowData["カテゴリ"] || "",
@@ -593,11 +616,20 @@ function appendRowToManagementSheet(sheet, data) {
     const newRange = sheet.getRange(lastRow, 1, 1, headers.length);
     newRange.setValues([rowData]);
     
-    // 画像数式を個別に設定
+    // 数式を個別に設定（写真と場所の列）
     for (let i = 0; i < headers.length; i++) {
-      if (headers[i] === "写真" && data["写真"] && data["写真"].startsWith("=IMAGE")) {
+      const cell = sheet.getRange(lastRow, i + 1);
+      
+      // 写真列の数式設定
+      if (headers[i] === "写真" && data["写真"] && data["写真"].startsWith("=HYPERLINK")) {
         console.log(`行${lastRow}、列${i+1}に写真数式を設定: ${data["写真"]}`);
-        sheet.getRange(lastRow, i + 1).setFormula(data["写真"]);
+        cell.setFormula(data["写真"]);
+      }
+      
+      // 場所列の数式設定
+      if (headers[i] === "場所" && data["場所"] && data["場所"].startsWith("=HYPERLINK")) {
+        console.log(`行${lastRow}、列${i+1}に場所数式を設定: ${data["場所"]}`);
+        cell.setFormula(data["場所"]);
       }
     }
     
@@ -663,7 +695,7 @@ function setupManagementSheet() {
     
     // ステータスのデータ検証（ドロップダウンリスト）
     const statusRule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(["未対応", "対応中", "完了", "対象外"], true)
+      .requireValueInList(["未対応", "対応中", "成約", "不成約", "対象外"], true)
       .build();
     manageSheet.getRange(2, 3, 1000, 1).setDataValidation(statusRule);
     
@@ -685,16 +717,23 @@ function setupManagementSheet() {
       .setRanges([manageSheet.getRange(2, 3, 1000, 1)])
       .build();
       
-    // 「完了」は緑背景
-    const completedRule = SpreadsheetApp.newConditionalFormatRule()
-      .whenTextEqualTo("完了")
+    // 「成約」は緑背景
+    const contractedRule = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo("成約")
       .setBackground("#CCFFCC")
+      .setRanges([manageSheet.getRange(2, 3, 1000, 1)])
+      .build();
+      
+    // 「不成約」は灰色背景
+    const notContractedRule = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo("不成約")
+      .setBackground("#EEEEEE")
       .setRanges([manageSheet.getRange(2, 3, 1000, 1)])
       .build();
       
     // 条件付き書式ルールを適用
     const rules = manageSheet.getConditionalFormatRules();
-    rules.push(unprocessedRule, inProgressRule, completedRule);
+    rules.push(unprocessedRule, inProgressRule, contractedRule, notContractedRule);
     manageSheet.setConditionalFormatRules(rules);
     
     // 1行目を固定表示
@@ -1007,10 +1046,11 @@ function testImageFormula() {
   }
   
   // テスト用のURL（手動で動作確認できたもの）
-  const testImageUrl = "https://drive.google.com/uc?export=view&id=1p4NSiA_27rezPR3QeCJYHPuLvwkc3Ms4";
+  const viewImageUrl = "https://drive.google.com/uc?export=view&id=1p4NSiA_27rezPR3QeCJYHPuLvwkc3Ms4";
+  const originalImageUrl = "https://drive.google.com/file/d/1p4NSiA_27rezPR3QeCJYHPuLvwkc3Ms4/view";
   
-  // 画像数式
-  const imageFormula = `=IMAGE("${testImageUrl}", 1)`;
+  // ハイパーリンク付き画像数式
+  const imageFormula = `=HYPERLINK("${originalImageUrl}",IMAGE("${viewImageUrl}", 1))`;
   
   try {
     // 最終行の次の行を取得
@@ -1102,19 +1142,23 @@ function diagnoseTranfer() {
     }
     
     // Google Drive URL形式の変換
+    let viewUrl = imageUrl;
+    let originalUrl = imageUrl;
+    
     if (imageUrl.includes("/file/d/")) {
       const fileIdMatch = imageUrl.match(/\/file\/d\/([^\/]+)/);
       if (fileIdMatch && fileIdMatch[1]) {
         const fileId = fileIdMatch[1];
-        const convertedUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
-        console.log("変換されたURL:", convertedUrl);
-        imageUrl = convertedUrl;
+        viewUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+        originalUrl = `https://drive.google.com/file/d/${fileId}/view`;
+        console.log("変換された表示用URL:", viewUrl);
+        console.log("変換された原寸大URL:", originalUrl);
       }
     }
     
-    // 手動でIMAGE関数を作成
-    const imageFormula = `=IMAGE("${imageUrl}", 1)`;
-    console.log("生成された画像数式:", imageFormula);
+    // 手動でハイパーリンク付き画像数式を作成
+    const imageFormula = `=HYPERLINK("${originalUrl}",IMAGE("${viewUrl}", 1))`;
+    console.log("生成されたハイパーリンク付き画像数式:", imageFormula);
     
     // prepareManagementDataで処理
     const managementData = prepareManagementData(rowData);
