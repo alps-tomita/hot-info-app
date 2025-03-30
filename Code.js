@@ -699,6 +699,33 @@ function setupManagementSheet() {
       .build();
     manageSheet.getRange(2, 3, 1000, 1).setDataValidation(statusRule);
     
+    // 担当者のデータ検証（担当者一覧シートを参照するドロップダウンリスト）
+    let staffListSheet = ss.getSheetByName("担当者一覧");
+    
+    // 担当者一覧シートが存在しない場合、エラーを表示して処理を続行
+    if (!staffListSheet) {
+      console.log("担当者一覧シートが見つかりません。担当者リストのドロップダウンは設定されません。");
+      SpreadsheetApp.getUi().alert("担当者一覧シートが見つかりません。担当者リストのドロップダウンは設定されません。");
+    } else {
+      // 担当者一覧シートの有効な範囲を取得（A列の空白でないセル）
+      const lastRow = staffListSheet.getLastRow();
+      if (lastRow > 0) {
+        // 担当者名の範囲を指定（A1からA最終行まで）
+        const staffNameRange = staffListSheet.getRange(1, 1, lastRow, 1);
+        
+        // データ検証ルールを作成
+        const staffRule = SpreadsheetApp.newDataValidation()
+          .requireValueInRange(staffNameRange, true)
+          .build();
+        
+        // 担当者列にデータ検証を適用
+        manageSheet.getRange(2, 4, 1000, 1).setDataValidation(staffRule);
+        console.log(`担当者リストのドロップダウンを設定しました（${lastRow}名）`);
+      } else {
+        console.log("担当者一覧シートにデータがありません");
+      }
+    }
+    
     // フィルター機能の追加
     manageSheet.getRange(1, 1, 1, headers.length).createFilter();
     
