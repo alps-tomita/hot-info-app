@@ -912,20 +912,32 @@ function transferDataAndNotify() {
   }
 }
 
-// onOpenメニューにトリガー設定機能を追加
+/**
+ * スプレッドシートを開いたときに実行される、メニュー設定
+ */
 function onOpen() {
-  const ui = SpreadsheetApp.getUi();
-  ui.createMenu('HOT情報管理')
-    .addItem('新規データを転記', 'transferDataToManagementSheet')
-    .addSeparator()
-    .addItem('転記状況を確認', 'checkTransferStatus')
-    .addItem('情報を検索', 'searchManagementSheet')
-    .addSeparator()
-    .addSubMenu(ui.createMenu('⚙️ 管理機能')
-      .addItem('情報管理シートの再初期化（注意）', 'setupManagementSheet')
-      .addItem('転記機能の診断実行', 'diagnoseTranfer')
-    )
-    .addToUi();
+  try {
+    const ui = SpreadsheetApp.getUi();
+    
+    // カスタムメニュー作成（シンプル化）
+    ui.createMenu('HOT情報管理')
+      .addItem('ダッシュボードを更新', 'updateDashboardTrigger')
+      .addItem('月次データを作成', 'createMonthlyReport')
+      .addSeparator()
+      .addItem('データ転送を手動実行', 'transferDataToManagementSheet')
+      .addSeparator()
+      .addItem('情報を検索', 'searchManagementSheet')
+      .addSubMenu(ui.createMenu('⚙️ 管理機能')
+        .addItem('情報管理シートの再初期化（注意）', 'setupManagementSheet')
+        .addItem('転記機能の診断実行', 'diagnoseTranfer')
+      )
+      .addToUi();
+    
+    console.log('カスタムメニューが追加されました');
+  } catch (error) {
+    console.error('メニュー作成エラー: ' + error.toString());
+    logDetailedError("onOpen", error);
+  }
 }
 
 /**
@@ -1259,4 +1271,1205 @@ function diagnoseTranfer() {
     console.error("診断中にエラーが発生しました:", error);
     return error.toString();
   }
-} 
+}
+
+/**
+ * ダッシュボードシートを作成・更新する関数
+ * 情報管理シートのデータを元に、サマリー情報を表示
+ */
+function createOrUpdateDashboard() {
+  try {
+    console.log("ダッシュボード更新を開始します");
+    
+    // スプレッドシートを取得
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const manageSheet = ss.getSheetByName("情報管理");
+    
+    if (!manageSheet) {
+      throw new Error("情報管理シートが見つかりません");
+    }
+    
+    // ダッシュボードシートを取得または作成
+    let dashboardSheet = ss.getSheetByName("ダッシュボード");
+    
+    if (!dashboardSheet) {
+      dashboardSheet = ss.insertSheet("ダッシュボード", 0); // 一番左に作成
+      console.log("ダッシュボードシートを新規作成しました");
+    } else {
+      // 既存の場合はクリア
+      dashboardSheet.clear();
+      console.log("既存のダッシュボードシートをクリアしました");
+    }
+    
+    // ダッシュボードのタイトル設定 - セル結合なし
+    dashboardSheet.getRange("A1").setValue("HOT情報管理 ダッシュボード");
+    dashboardSheet.getRange("A1:H1").setBackground("#4285f4").setFontColor("#ffffff").setFontWeight("bold")
+      .setFontSize(14).setHorizontalAlignment("center");
+    
+    // 更新日時の表示 - セル結合なし
+    const now = new Date();
+    dashboardSheet.getRange("I1").setValue("最終更新: " + now.toLocaleString("ja-JP"));
+    dashboardSheet.getRange("I1:K1").setBackground("#E0E0E0");
+    
+    // 情報管理シートからデータを取得
+    const manageData = getSheetDataAsObjects(manageSheet);
+    if (manageData.length === 0) {
+      dashboardSheet.getRange("A3").setValue("データがありません");
+      return true;
+    }
+    
+    // データの状態をログ出力
+    console.log(`${manageData.length}件のデータを取得しました`);
+    console.log("最初の行のデータサンプル:", JSON.stringify(manageData[0]));
+    
+    try {
+      // セクション1: 直近3ヶ月の集計
+      createRecentSummary(dashboardSheet, manageData, 3);
+      console.log("直近3ヶ月の集計を作成しました");
+      
+      // セクション2: ステータス別集計
+      createStatusSummary(dashboardSheet, manageData);
+      console.log("ステータス別集計を作成しました");
+      
+      // セクション3: 最新情報リスト（直近2週間）
+      createRecentDataTable(dashboardSheet, manageData);
+      console.log("最新情報リストを作成しました");
+      
+      // セクション4: ルート別集計
+      createRouteSummary(dashboardSheet, manageData);
+      console.log("ルート別集計を作成しました");
+      
+      // セクション5: 工事進捗状況別集計
+      createProgressSummary(dashboardSheet, manageData);
+      console.log("工事進捗状況別集計を作成しました");
+    } catch (sectionError) {
+      console.error("セクション作成中にエラーが発生しました: " + sectionError.toString());
+      logDetailedError("createOrUpdateDashboard_section", sectionError);
+      dashboardSheet.getRange("A3").setValue("一部セクションの更新中にエラーが発生しました: " + sectionError.toString());
+      // エラーが発生しても処理を続行
+    }
+    
+    // 列幅の調整
+    dashboardSheet.setColumnWidth(1, 150);
+    dashboardSheet.setColumnWidth(2, 150);
+    dashboardSheet.setColumnWidth(3, 150);
+    dashboardSheet.setColumnWidth(4, 150);
+    dashboardSheet.setColumnWidth(5, 150);
+    dashboardSheet.setColumnWidth(6, 150);
+    dashboardSheet.setColumnWidth(7, 200);
+    dashboardSheet.setColumnWidth(8, 150);
+    dashboardSheet.setColumnWidth(9, 150);
+    dashboardSheet.setColumnWidth(10, 150);
+    dashboardSheet.setColumnWidth(11, 150);
+    
+    // 1行目を固定
+    dashboardSheet.setFrozenRows(1);
+    
+    console.log("ダッシュボードの更新が完了しました");
+    return true;
+    
+  } catch (error) {
+    console.error("ダッシュボード更新エラー: " + error.toString());
+    logDetailedError("createOrUpdateDashboard", error);
+    return false;
+  }
+}
+
+/**
+ * 直近の集計情報を作成する関数
+ * @param {Sheet} sheet - ダッシュボードシート
+ * @param {Array} data - 情報管理シートのデータ
+ * @param {Number} months - 集計する月数（デフォルト3ヶ月）
+ */
+function createRecentSummary(sheet, data, months = 3) {
+  try {
+    // セクションタイトル - 結合なし
+    sheet.getRange("A3").setValue(`直近${months}ヶ月の集計情報`);
+    sheet.getRange("A3:E3").setBackground("#E0E0E0").setFontWeight("bold");
+    
+    // 日付の範囲計算
+    const now = new Date();
+    const monthsAgo = new Date();
+    monthsAgo.setMonth(now.getMonth() - months);
+    
+    // 直近データをフィルタリング
+    const recentData = data.filter(row => {
+      const dateValue = row["タイムスタンプ"] || row["データ取得日時"];
+      if (!dateValue) return false;
+      
+      const rowDate = new Date(dateValue);
+      return rowDate >= monthsAgo;
+    });
+    
+    // 総件数
+    sheet.getRange("A5").setValue("総件数:");
+    sheet.getRange("B5").setValue(recentData.length);
+    
+    // ステータス別集計
+    sheet.getRange("A6").setValue("ステータス別:");
+    
+    // ステータスの件数をカウント
+    const statusCounts = {};
+    recentData.forEach(row => {
+      const status = row["ステータス"] || row["対応ステータス"] || "不明";
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
+    
+    // ステータス表示の順序を設定
+    const statusOrder = ["未対応", "対応中", "成約", "対象外", "不成約", "不明"];
+    
+    // 指定された順序でステータスを表示
+    let rowIndex = 7;
+    for (const status of statusOrder) {
+      if (statusCounts[status]) {
+        sheet.getRange(rowIndex, 1).setValue(status);
+        sheet.getRange(rowIndex, 2).setValue(statusCounts[status]);
+        
+        // ステータスに応じた背景色設定
+        if (status === "未対応") {
+          sheet.getRange(rowIndex, 1).setBackground("#FFCCCC");
+        } else if (status === "対応中") {
+          sheet.getRange(rowIndex, 1).setBackground("#FFFFCC");
+        } else if (status === "成約") {
+          sheet.getRange(rowIndex, 1).setBackground("#CCFFCC");
+        }
+        
+        rowIndex++;
+      }
+    }
+    
+    // その他のステータスを表示（指定された順序以外のもの）
+    for (const [status, count] of Object.entries(statusCounts)) {
+      if (!statusOrder.includes(status)) {
+        sheet.getRange(rowIndex, 1).setValue(status);
+        sheet.getRange(rowIndex, 2).setValue(count);
+        rowIndex++;
+      }
+    }
+    
+    // 月別件数
+    sheet.getRange("A" + (rowIndex + 1)).setValue("月別件数:");
+    rowIndex += 2;
+    
+    // 月ごとのデータをカウント
+    const monthCounts = {};
+    recentData.forEach(row => {
+      const dateValue = row["タイムスタンプ"] || row["データ取得日時"];
+      if (dateValue) {
+        const rowDate = new Date(dateValue);
+        const yearMonth = Utilities.formatDate(rowDate, "JST", "yyyy-MM");
+        monthCounts[yearMonth] = (monthCounts[yearMonth] || 0) + 1;
+      }
+    });
+    
+    // 日付順（降順）で月別データを表示
+    const sortedMonths = Object.keys(monthCounts).sort().reverse();
+    for (const yearMonth of sortedMonths) {
+      sheet.getRange(rowIndex, 1).setValue(yearMonth);
+      sheet.getRange(rowIndex, 2).setValue(monthCounts[yearMonth]);
+      rowIndex++;
+    }
+  } catch (error) {
+    console.error("直近集計作成エラー: " + error.toString());
+    logDetailedError("createRecentSummary", error);
+  }
+}
+
+/**
+ * ステータス別の集計情報を作成する関数
+ * @param {Sheet} sheet - ダッシュボードシート
+ * @param {Array} data - 情報管理シートのデータ
+ */
+function createStatusSummary(sheet, data) {
+  try {
+    // セクションタイトル - 結合なし
+    sheet.getRange("F3").setValue("ステータス別詳細");
+    sheet.getRange("F3:K3").setBackground("#E0E0E0").setFontWeight("bold");
+    
+    // 日付の範囲計算
+    const now = new Date();
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(now.getMonth() - 3);
+    
+    // 直近3ヶ月のデータをフィルタリング
+    const recentData = data.filter(row => {
+      const dateValue = row["タイムスタンプ"] || row["データ取得日時"];
+      if (!dateValue) return false;
+      
+      const rowDate = new Date(dateValue);
+      return rowDate >= threeMonthsAgo;
+    });
+    
+    // 表のヘッダー
+    sheet.getRange("F5").setValue("ステータス");
+    sheet.getRange("G5").setValue("総件数");
+    sheet.getRange("H5").setValue("カテゴリ別内訳");
+    sheet.getRange("I5").setValue("最近の更新");
+    
+    // ヘッダーの書式設定
+    sheet.getRange("F5:I5").setBackground("#f3f3f3").setFontWeight("bold");
+    
+    // ステータスの件数とカテゴリをカウント
+    const statusData = {};
+    const statusLastUpdate = {};
+    
+    recentData.forEach(row => {
+      const status = row["ステータス"] || row["対応ステータス"] || "不明";
+      const category = row["カテゴリ"] || "未設定";
+      const dateValue = row["タイムスタンプ"] || row["データ取得日時"];
+      
+      // ステータスのデータを初期化（なければ）
+      if (!statusData[status]) {
+        statusData[status] = {
+          count: 0,
+          categories: {}
+        };
+      }
+      
+      // カウント増加
+      statusData[status].count++;
+      statusData[status].categories[category] = (statusData[status].categories[category] || 0) + 1;
+      
+      // 最新の更新日を記録
+      if (dateValue) {
+        const updateDate = new Date(dateValue);
+        if (!statusLastUpdate[status] || updateDate > statusLastUpdate[status]) {
+          statusLastUpdate[status] = updateDate;
+        }
+      }
+    });
+    
+    // ステータス表示の順序を設定
+    const statusOrder = ["未対応", "対応中", "成約", "対象外", "不成約"];
+    
+    // 指定された順序でステータスを表示
+    let rowIndex = 6;
+    
+    // 主要なステータスを優先表示
+    for (const status of statusOrder) {
+      if (statusData[status]) {
+        displayStatusRow(sheet, rowIndex, status, statusData[status], statusLastUpdate[status]);
+        rowIndex++;
+        delete statusData[status]; // 表示済みは削除
+      }
+    }
+    
+    // その他のステータスを表示
+    for (const [status, data] of Object.entries(statusData)) {
+      displayStatusRow(sheet, rowIndex, status, data, statusLastUpdate[status]);
+      rowIndex++;
+    }
+    
+    // 表の枠線設定
+    sheet.getRange("F5:I" + (rowIndex - 1)).setBorder(true, true, true, true, true, true);
+  } catch (error) {
+    console.error("ステータス別詳細作成エラー: " + error.toString());
+    logDetailedError("createStatusSummary", error);
+    sheet.getRange("F5").setValue("エラーが発生しました: " + error.toString());
+  }
+}
+
+/**
+ * 最新情報リストを作成する関数
+ * @param {Sheet} sheet - ダッシュボードシート
+ * @param {Array} data - 情報管理シートのデータ
+ */
+function createRecentDataTable(sheet, data) {
+  try {
+    // セクションタイトル - 結合なし
+    const startRow = 20;
+    sheet.getRange(startRow, 1).setValue("最新情報リスト（直近2週間）");
+    sheet.getRange(startRow, 1, 1, 10).setBackground("#E0E0E0").setFontWeight("bold");
+    
+    // 日付の範囲計算
+    const now = new Date();
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(now.getDate() - 14);
+    
+    // 直近データをフィルタリング
+    const recentData = data.filter(row => {
+      // タイムスタンプかデータ取得日時のどちらか存在する方を使用
+      const dateValue = row["タイムスタンプ"] || row["データ取得日時"];
+      if (!dateValue) return false;
+      
+      const rowDate = new Date(dateValue);
+      return rowDate >= twoWeeksAgo;
+    }).sort((a, b) => {
+      // 日付の新しい順にソート
+      const dateA = new Date(a["タイムスタンプ"] || a["データ取得日時"]);
+      const dateB = new Date(b["タイムスタンプ"] || b["データ取得日時"]);
+      return dateB - dateA;
+    });
+    
+    // 表のヘッダー
+    const headers = ["取得日時", "ステータス", "ルート", "カテゴリ", "資料配布状況", "工事進捗状況", "場所", "コメント"];
+    
+    // ヘッダーの設定
+    for (let i = 0; i < headers.length; i++) {
+      sheet.getRange(startRow + 2, i + 1).setValue(headers[i]);
+    }
+    
+    // ヘッダーの書式設定
+    sheet.getRange(startRow + 2, 1, 1, headers.length).setBackground("#f3f3f3").setFontWeight("bold");
+    
+    // データがない場合
+    if (recentData.length === 0) {
+      sheet.getRange(startRow + 3, 1).setValue("表示するデータがありません");
+      // 他のセルは空白にしておく
+      return;
+    }
+    
+    // データの表示（最大20件まで）
+    const displayCount = Math.min(recentData.length, 20);
+    
+    for (let i = 0; i < displayCount; i++) {
+      const row = recentData[i];
+      
+      try {
+        // 日付フォーマット
+        const dateValue = row["タイムスタンプ"] || row["データ取得日時"];
+        const date = new Date(dateValue);
+        const formattedDate = Utilities.formatDate(date, "JST", "yyyy/MM/dd HH:mm");
+        
+        // データを設定
+        sheet.getRange(startRow + 3 + i, 1).setValue(formattedDate);
+        sheet.getRange(startRow + 3 + i, 2).setValue(row["ステータス"] || row["対応ステータス"] || "");
+        sheet.getRange(startRow + 3 + i, 3).setValue(row["ルート名"] || row["ルート"] || "");
+        sheet.getRange(startRow + 3 + i, 4).setValue(row["カテゴリ"] || "");
+        sheet.getRange(startRow + 3 + i, 5).setValue(row["資料配布状況"] || "");
+        sheet.getRange(startRow + 3 + i, 6).setValue(row["工事進捗状況"] || "");
+        
+        // 場所の処理（HYPERLINK関数対応）
+        const locationValue = row["場所"] || row["住所"];
+        if (locationValue) {
+          // HYPERLINKかどうかに関わらず、テキストとして表示する
+          sheet.getRange(startRow + 3 + i, 7).setValue(locationValue.toString().replace(/=HYPERLINK\("[^"]+",\s*"([^"]+)"\)/i, "$1"));
+        } else {
+          sheet.getRange(startRow + 3 + i, 7).setValue("");
+        }
+        
+        sheet.getRange(startRow + 3 + i, 8).setValue(row["コメント"] || "");
+        
+        // ステータスに応じた背景色設定
+        const status = row["ステータス"] || row["対応ステータス"] || "";
+        if (status === "未対応") {
+          sheet.getRange(startRow + 3 + i, 2).setBackground("#FFCCCC");
+        } else if (status === "対応中") {
+          sheet.getRange(startRow + 3 + i, 2).setBackground("#FFFFCC");
+        } else if (status === "成約") {
+          sheet.getRange(startRow + 3 + i, 2).setBackground("#CCFFCC");
+        }
+      } catch (error) {
+        console.error(`データ表示エラー(行 ${i+1}): ${error.toString()}`);
+        // エラーが発生しても処理を続行
+        sheet.getRange(startRow + 3 + i, 1).setValue("エラー");
+        sheet.getRange(startRow + 3 + i, 2).setValue(error.toString());
+      }
+    }
+    
+    // 表の枠線設定
+    sheet.getRange(startRow + 2, 1, displayCount + 1, headers.length).setBorder(true, true, true, true, true, true);
+  } catch (error) {
+    console.error("最新情報リスト作成エラー: " + error.toString());
+    logDetailedError("createRecentDataTable", error);
+  }
+}
+
+/**
+ * ルート別集計を作成する関数
+ * @param {Sheet} sheet - ダッシュボードシート
+ * @param {Array} data - 情報管理シートのデータ
+ */
+function createRouteSummary(sheet, data) {
+  try {
+    // セクションタイトル - 結合なし
+    const startRow = 20;
+    const startCol = 10;
+    sheet.getRange(startRow, startCol).setValue("ルート別集計");
+    sheet.getRange(startRow, startCol, 1, 3).setBackground("#E0E0E0").setFontWeight("bold");
+    
+    // 日付の範囲計算
+    const now = new Date();
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(now.getMonth() - 3);
+    
+    // 直近3ヶ月のデータをフィルタリング
+    const recentData = data.filter(row => {
+      const dateValue = row["タイムスタンプ"] || row["データ取得日時"];
+      if (!dateValue) return false;
+      
+      const rowDate = new Date(dateValue);
+      return rowDate >= threeMonthsAgo;
+    });
+    
+    // ルート別にカウント
+    const routeCounts = {};
+    recentData.forEach(row => {
+      const route = row["ルート名"] || row["ルート"] || "未設定";
+      routeCounts[route] = (routeCounts[route] || 0) + 1;
+    });
+    
+    // 表のヘッダー
+    sheet.getRange(startRow + 2, startCol).setValue("ルート名");
+    sheet.getRange(startRow + 2, startCol + 1).setValue("件数");
+    
+    // ヘッダーの書式設定
+    sheet.getRange(startRow + 2, startCol, 1, 2).setBackground("#f3f3f3").setFontWeight("bold");
+    
+    // データの表示
+    let rowOffset = 3;
+    
+    // 件数の多い順にソート
+    const sortedRoutes = Object.entries(routeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(entry => entry[0]);
+    
+    for (const route of sortedRoutes) {
+      const count = routeCounts[route];
+      
+      sheet.getRange(startRow + rowOffset, startCol).setValue(route);
+      sheet.getRange(startRow + rowOffset, startCol + 1).setValue(count);
+      
+      rowOffset++;
+      
+      // 最大10件まで表示
+      if (rowOffset > 12) break;
+    }
+    
+    // 表の枠線設定
+    sheet.getRange(startRow + 2, startCol, rowOffset - 2, 2).setBorder(true, true, true, true, true, true);
+  } catch (error) {
+    console.error("ルート別集計作成エラー: " + error.toString());
+    logDetailedError("createRouteSummary", error);
+  }
+}
+
+/**
+ * 工事進捗状況別集計を作成する関数
+ * @param {Sheet} sheet - ダッシュボードシート
+ * @param {Array} data - 情報管理シートのデータ
+ */
+function createProgressSummary(sheet, data) {
+  try {
+    // セクションタイトル - 結合なし
+    const startRow = 45;
+    sheet.getRange(startRow, 1).setValue("工事進捗状況別集計");
+    sheet.getRange(startRow, 1, 1, 5).setBackground("#E0E0E0").setFontWeight("bold");
+    
+    // 日付の範囲計算
+    const now = new Date();
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(now.getMonth() - 3);
+    
+    // 直近3ヶ月のデータをフィルタリング
+    const recentData = data.filter(row => {
+      const dateValue = row["タイムスタンプ"] || row["データ取得日時"];
+      if (!dateValue) return false;
+      
+      const rowDate = new Date(dateValue);
+      return rowDate >= threeMonthsAgo;
+    });
+    
+    // 工事進捗状況別にカウント
+    const progressCounts = {};
+    recentData.forEach(row => {
+      const progress = row["工事進捗状況"] || "未設定";
+      progressCounts[progress] = (progressCounts[progress] || 0) + 1;
+    });
+    
+    // 表のヘッダー
+    sheet.getRange(startRow + 2, 1).setValue("工事進捗状況");
+    sheet.getRange(startRow + 2, 2).setValue("件数");
+    sheet.getRange(startRow + 2, 3).setValue("未対応件数");
+    sheet.getRange(startRow + 2, 4).setValue("対応中件数");
+    sheet.getRange(startRow + 2, 5).setValue("成約件数");
+    
+    // ヘッダーの書式設定
+    sheet.getRange(startRow + 2, 1, 1, 5).setBackground("#f3f3f3").setFontWeight("bold");
+    
+    // データの表示
+    let rowOffset = 3;
+    
+    // 主要な工事進捗状況（優先表示）
+    const keyProgress = [
+      "内装工事中（初期段階）",
+      "内装工事中（近日終了？）",
+      "外装完了",
+      "オープン間近",
+      "解体中"
+    ];
+    
+    // まず主要な進捗状況を表示
+    for (const progress of keyProgress) {
+      if (progressCounts[progress]) {
+        displayProgressRow(sheet, startRow + rowOffset, progress, progressCounts[progress], recentData);
+        rowOffset++;
+        delete progressCounts[progress]; // 表示済みは削除
+      }
+    }
+    
+    // その他の進捗状況を表示
+    for (const [progress, count] of Object.entries(progressCounts)) {
+      if (progress !== "未設定") {
+        displayProgressRow(sheet, startRow + rowOffset, progress, count, recentData);
+        rowOffset++;
+      }
+    }
+    
+    // 未設定も表示
+    if (progressCounts["未設定"]) {
+      displayProgressRow(sheet, startRow + rowOffset, "未設定", progressCounts["未設定"], recentData);
+      rowOffset++;
+    }
+    
+    // 表の枠線設定
+    sheet.getRange(startRow + 2, 1, rowOffset - 2, 5).setBorder(true, true, true, true, true, true);
+  } catch (error) {
+    console.error("工事進捗状況集計エラー: " + error.toString());
+    logDetailedError("createProgressSummary", error);
+    sheet.getRange(startRow + 2, 1).setValue("エラーが発生しました: " + error.toString());
+  }
+}
+
+/**
+ * 工事進捗状況の詳細行を表示する関数
+ * @param {Sheet} sheet - ダッシュボードシート
+ * @param {Number} row - 表示する行番号
+ * @param {String} progress - 工事進捗状況
+ * @param {Number} count - 総件数
+ * @param {Array} data - 集計対象データ
+ */
+function displayProgressRow(sheet, row, progress, count, data) {
+  try {
+    // 基本情報を設定
+    sheet.getRange(row, 1).setValue(progress);
+    sheet.getRange(row, 2).setValue(count);
+    
+    // ステータス別にフィルタリングしてカウント
+    const unprocessedCount = data.filter(item => 
+      (item["工事進捗状況"] || "") === progress && 
+      (item["ステータス"] || item["対応ステータス"] || "") === "未対応"
+    ).length;
+    
+    const inProgressCount = data.filter(item => 
+      (item["工事進捗状況"] || "") === progress && 
+      (item["ステータス"] || item["対応ステータス"] || "") === "対応中"
+    ).length;
+    
+    const contractedCount = data.filter(item => 
+      (item["工事進捗状況"] || "") === progress && 
+      (item["ステータス"] || item["対応ステータス"] || "") === "成約"
+    ).length;
+    
+    // ステータス別の件数を設定
+    sheet.getRange(row, 3).setValue(unprocessedCount);
+    sheet.getRange(row, 4).setValue(inProgressCount);
+    sheet.getRange(row, 5).setValue(contractedCount);
+    
+    // オープン間近は強調表示
+    if (progress === "オープン間近") {
+      sheet.getRange(row, 1, 1, 5).setBackground("#ffff99");
+    }
+  } catch (error) {
+    console.error(`進捗行表示エラー(${progress}): ${error.toString()}`);
+    sheet.getRange(row, 1).setValue(progress);
+    sheet.getRange(row, 2).setValue("エラー");
+  }
+}
+
+/**
+ * ダッシュボード更新トリガー
+ * メニューアクションからダッシュボードを手動更新するための関数
+ */
+function updateDashboardTrigger() {
+  try {
+    const result = createOrUpdateDashboard();
+    const ui = SpreadsheetApp.getUi();
+    
+    if (result) {
+      ui.alert('ダッシュボード更新', 'ダッシュボードが正常に更新されました。', ui.ButtonSet.OK);
+    } else {
+      ui.alert('ダッシュボード更新エラー', 
+               'ダッシュボードの更新中にエラーが発生しました。\n詳細はログを確認してください。', 
+               ui.ButtonSet.OK);
+    }
+  } catch (error) {
+    console.error('ダッシュボード更新実行エラー: ' + error.toString());
+    logDetailedError("updateDashboardTrigger", error);
+    
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('エラー', 
+             '処理中に予期しないエラーが発生しました: ' + error.toString(), 
+             ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 毎日のダッシュボード自動更新トリガーを設定する関数
+ */
+function setupDailyDashboardUpdate() {
+  try {
+    // 既存のトリガーを確認
+    const triggers = ScriptApp.getProjectTriggers();
+    let dashboardTriggerExists = false;
+    
+    // ダッシュボード更新トリガーがすでに存在するか確認
+    triggers.forEach(trigger => {
+      if (trigger.getHandlerFunction() === 'createOrUpdateDashboard') {
+        dashboardTriggerExists = true;
+      }
+    });
+    
+    // トリガーが存在しない場合のみ作成
+    if (!dashboardTriggerExists) {
+      // 毎日午前6時に実行するトリガーを作成
+      ScriptApp.newTrigger('createOrUpdateDashboard')
+        .timeBased()
+        .everyDays(1)
+        .atHour(6)
+        .create();
+      
+      console.log("ダッシュボード自動更新トリガーを設定しました（毎日午前6時）");
+      return "毎日午前6時のダッシュボード自動更新を設定しました";
+    } else {
+      console.log("ダッシュボード自動更新トリガーはすでに設定されています");
+      return "ダッシュボード自動更新トリガーはすでに設定されています";
+    }
+  } catch (error) {
+    console.error("トリガー設定エラー: " + error.toString());
+    return "エラーが発生しました: " + error.toString();
+  }
+}
+
+/**
+ * ダッシュボード自動更新トリガーを削除する関数
+ */
+function removeDashboardUpdateTrigger() {
+  try {
+    // 既存のトリガーを取得
+    const triggers = ScriptApp.getProjectTriggers();
+    let triggerRemoved = false;
+    
+    // ダッシュボード更新トリガーを検索して削除
+    triggers.forEach(trigger => {
+      if (trigger.getHandlerFunction() === 'createOrUpdateDashboard') {
+        ScriptApp.deleteTrigger(trigger);
+        triggerRemoved = true;
+      }
+    });
+    
+    if (triggerRemoved) {
+      console.log("ダッシュボード自動更新トリガーを削除しました");
+      return "ダッシュボード自動更新トリガーを削除しました";
+    } else {
+      console.log("削除すべきダッシュボード自動更新トリガーはありませんでした");
+      return "ダッシュボード自動更新トリガーは設定されていません";
+    }
+  } catch (error) {
+    console.error("トリガー削除エラー: " + error.toString());
+    return "エラーが発生しました: " + error.toString();
+  }
+}
+
+/**
+ * 月次集計シートを作成する関数
+ * 毎月の情報を集計して別シートに保存し、データ管理を容易にする
+ */
+function createMonthlyReport() {
+  try {
+    console.log("月次レポート作成を開始します");
+    
+    // スプレッドシートを取得
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const manageSheet = ss.getSheetByName("情報管理");
+    
+    if (!manageSheet) {
+      throw new Error("情報管理シートが見つかりません");
+    }
+    
+    // 情報管理シートからデータを取得
+    const manageData = getSheetDataAsObjects(manageSheet);
+    if (manageData.length === 0) {
+      console.log("データがありません");
+      SpreadsheetApp.getUi().alert("データがありません。情報管理シートにデータを追加してください。");
+      return true;
+    }
+    
+    // 現在の年月を取得
+    const now = new Date();
+    const lastMonth = new Date(now);
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    const yearMonth = Utilities.formatDate(lastMonth, "JST", "yyyy-MM");
+    const yearMonthDisplay = Utilities.formatDate(lastMonth, "JST", "yyyy年MM月");
+    
+    // 月次レポートシート名
+    const sheetName = "月次集計";
+    
+    // 既存のシートを確認
+    let monthlySheet = ss.getSheetByName(sheetName);
+    
+    if (!monthlySheet) {
+      // 新規シートを作成
+      monthlySheet = ss.insertSheet(sheetName);
+      setupMonthlyReportSheet(monthlySheet);
+      console.log(`${sheetName}シートを新規作成しました`);
+    }
+    
+    // 指定年月のデータをフィルタリング
+    const monthlyData = manageData.filter(row => {
+      const dateValue = row["タイムスタンプ"] || row["データ取得日時"];
+      if (!dateValue) return false;
+      
+      const rowDate = new Date(dateValue);
+      const rowYearMonth = Utilities.formatDate(rowDate, "JST", "yyyy-MM");
+      return rowYearMonth === yearMonth;
+    });
+    
+    // データがない場合
+    if (monthlyData.length === 0) {
+      const ui = SpreadsheetApp.getUi();
+      ui.alert(`${yearMonthDisplay}のデータはありません`, 
+               `${yearMonthDisplay}に該当するデータが見つかりませんでした。`, 
+               ui.ButtonSet.OK);
+      return true;
+    }
+    
+    // 既存データの確認
+    const lastRow = monthlySheet.getLastRow();
+    const dataRange = monthlySheet.getRange(2, 1, Math.max(1, lastRow - 1), 1).getValues();
+    
+    // すでに同じ月のデータがあるか確認
+    let existingRow = -1;
+    for (let i = 0; i < dataRange.length; i++) {
+      if (dataRange[i][0] === yearMonthDisplay) {
+        existingRow = i + 2; // ヘッダー行(1行目)の次から始まるため+2
+        break;
+      }
+    }
+    
+    // ステータス別件数集計
+    const statusCounts = {
+      "未対応": 0,
+      "対応中": 0,
+      "成約": 0,
+      "不成約": 0,
+      "対象外": 0
+    };
+    
+    monthlyData.forEach(row => {
+      const status = row["ステータス"] || row["対応ステータス"] || "";
+      if (statusCounts.hasOwnProperty(status)) {
+        statusCounts[status]++;
+      }
+    });
+    
+    // ルート別集計
+    const routeCounts = {};
+    monthlyData.forEach(row => {
+      const route = row["ルート名"] || row["ルート"] || "未設定";
+      routeCounts[route] = (routeCounts[route] || 0) + 1;
+    });
+    
+    // 上位3つのルートを取得（表示用）
+    const topRoutes = Object.entries(routeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([route, count]) => `${route}: ${count}件`)
+      .join(", ");
+    
+    // ルート別のすべての情報をJSON形式で保存
+    const routeDetailJson = JSON.stringify(
+      Object.entries(routeCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([route, count]) => ({
+          route: route,
+          count: count,
+          percent: Math.round((count / monthlyData.length) * 100) + "%"
+        }))
+    );
+    
+    // カテゴリ別集計
+    const categoryCounts = {};
+    monthlyData.forEach(row => {
+      const category = row["カテゴリ"] || "未設定";
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+    });
+    
+    // 上位3つのカテゴリを取得
+    const topCategories = Object.entries(categoryCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([category, count]) => `${category}: ${count}件`)
+      .join(", ");
+    
+    // データ行を作成
+    const dataRow = [
+      yearMonthDisplay,                         // 年月
+      monthlyData.length,                       // 総件数
+      statusCounts["未対応"],                    // 未対応
+      statusCounts["対応中"],                    // 対応中
+      statusCounts["成約"],                      // 成約
+      statusCounts["不成約"],                    // 不成約
+      statusCounts["対象外"],                    // 対象外
+      topRoutes,                                // ルート別上位（表示用）
+      routeDetailJson,                          // ルート別全データ（JSON形式）
+      topCategories,                            // カテゴリ別上位
+      new Date()                                // 作成日時
+    ];
+    
+    // 更新または新規追加
+    if (existingRow > 0) {
+      // 既存行を更新
+      monthlySheet.getRange(existingRow, 1, 1, dataRow.length).setValues([dataRow]);
+      console.log(`${yearMonthDisplay}のデータを更新しました`);
+    } else {
+      // 新規行を追加
+      monthlySheet.appendRow(dataRow);
+      console.log(`${yearMonthDisplay}のデータを追加しました`);
+    }
+    
+    // 行ごとの色分け
+    const rowsCount = monthlySheet.getLastRow();
+    for (let i = 2; i <= rowsCount; i++) {
+      const rowColor = i % 2 === 0 ? "#f8f8f8" : "#ffffff";
+      monthlySheet.getRange(i, 1, 1, dataRow.length).setBackground(rowColor);
+    }
+    
+    // 完了メッセージ
+    const ui = SpreadsheetApp.getUi();
+    ui.alert("月次データ集計完了", 
+             `${yearMonthDisplay}のデータ（${monthlyData.length}件）を月次集計シートに${existingRow > 0 ? "更新" : "追加"}しました。`, 
+             ui.ButtonSet.OK);
+    
+    return true;
+    
+  } catch (error) {
+    console.error("月次レポート作成エラー: " + error.toString());
+    logDetailedError("createMonthlyReport", error);
+    
+    const ui = SpreadsheetApp.getUi();
+    ui.alert("エラー", 
+             "月次レポート作成中にエラーが発生しました: " + error.toString(), 
+             ui.ButtonSet.OK);
+    
+    return false;
+  }
+}
+
+/**
+ * 月次レポートシートの初期設定
+ */
+function setupMonthlyReportSheet(sheet) {
+  try {
+    // タイトル設定
+    const headers = [
+      "年月", "総件数", "未対応", "対応中", "成約", "不成約", "対象外", 
+      "ルート別TOP3", "ルートデータ(JSON)", "カテゴリ別TOP3", "作成日時"
+    ];
+    
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setBackground("#E0E0E0").setFontWeight("bold");
+    
+    // 列幅調整
+    sheet.setColumnWidth(1, 100);   // 年月
+    sheet.setColumnWidth(2, 70);    // 総件数
+    sheet.setColumnWidth(3, 70);    // 未対応
+    sheet.setColumnWidth(4, 70);    // 対応中
+    sheet.setColumnWidth(5, 70);    // 成約
+    sheet.setColumnWidth(6, 70);    // 不成約
+    sheet.setColumnWidth(7, 70);    // 対象外
+    sheet.setColumnWidth(8, 200);   // ルート別TOP3
+    sheet.setColumnWidth(9, 300);   // ルートデータ(JSON)
+    sheet.setColumnWidth(10, 200);  // カテゴリ別TOP3
+    sheet.setColumnWidth(11, 150);  // 作成日時
+    
+    // JSONデータ列のメモを追加
+    sheet.getRange(1, 9).setNote("このセルにはすべてのルート情報がJSON形式で保存されています。\n" +
+                                "データ分析が必要な場合は、このJSONデータを使用してください。\n" +
+                                "形式: [{route:'ルート名',count:件数,percent:'割合%'},...]");
+    
+    // 1行目を固定
+    sheet.setFrozenRows(1);
+    
+    console.log("月次レポートシートの初期設定が完了しました");
+  } catch (error) {
+    console.error("月次レポートシート初期設定エラー: " + error.toString());
+    logDetailedError("setupMonthlyReportSheet", error);
+  }
+}
+
+/**
+ * 月次集計トリガーを設定する関数
+ * 毎月1日に自動実行
+ */
+function setupMonthlyReportTrigger() {
+  try {
+    // 既存のトリガーを確認
+    const triggers = ScriptApp.getProjectTriggers();
+    let monthlyReportTriggerExists = false;
+    
+    // 月次集計トリガーがすでに存在するか確認
+    triggers.forEach(trigger => {
+      if (trigger.getHandlerFunction() === 'createMonthlyReport') {
+        monthlyReportTriggerExists = true;
+      }
+    });
+    
+    // トリガーが存在しない場合のみ作成
+    if (!monthlyReportTriggerExists) {
+      // 毎月1日午前9時に実行するトリガーを作成
+      ScriptApp.newTrigger('createMonthlyReport')
+        .timeBased()
+        .onMonthDay(1)
+        .atHour(9)
+        .create();
+      
+      console.log("月次集計トリガーを設定しました（毎月1日午前9時）");
+      SpreadsheetApp.getUi().alert("月次集計トリガーを設定しました（毎月1日午前9時）");
+      return "月次集計トリガーを設定しました";
+    } else {
+      console.log("月次集計トリガーはすでに設定されています");
+      SpreadsheetApp.getUi().alert("月次集計トリガーはすでに設定されています");
+      return "月次集計トリガーはすでに設定されています";
+    }
+  } catch (error) {
+    console.error("トリガー設定エラー: " + error.toString());
+    SpreadsheetApp.getUi().alert("エラーが発生しました: " + error.toString());
+    return "エラーが発生しました: " + error.toString();
+  }
+}
+
+/**
+ * 月次集計トリガーを削除する関数
+ */
+function removeMonthlyReportTrigger() {
+  try {
+    // 既存のトリガーを取得
+    const triggers = ScriptApp.getProjectTriggers();
+    let triggerRemoved = false;
+    
+    // 月次集計トリガーを検索して削除
+    triggers.forEach(trigger => {
+      if (trigger.getHandlerFunction() === 'createMonthlyReport') {
+        ScriptApp.deleteTrigger(trigger);
+        triggerRemoved = true;
+      }
+    });
+    
+    if (triggerRemoved) {
+      console.log("月次集計トリガーを削除しました");
+      SpreadsheetApp.getUi().alert("月次集計トリガーを削除しました");
+      return "月次集計トリガーを削除しました";
+    } else {
+      console.log("月次集計トリガーはありませんでした");
+      SpreadsheetApp.getUi().alert("月次集計トリガーはありませんでした");
+      return "月次集計トリガーはありませんでした";
+    }
+  } catch (error) {
+    console.error("トリガー削除エラー: " + error.toString());
+    SpreadsheetApp.getUi().alert("エラーが発生しました: " + error.toString());
+    return "エラーが発生しました: " + error.toString();
+  }
+}
+
+/**
+ * 月次集計を手動で実行する関数
+ * メニューアクションから呼び出すためのトリガー関数
+ */
+function runMonthlyReportManually() {
+  try {
+    const result = createMonthlyReport();
+    const ui = SpreadsheetApp.getUi();
+    
+    if (result) {
+      ui.alert('月次レポート作成', '月次レポートが正常に作成されました。', ui.ButtonSet.OK);
+    } else {
+      ui.alert('月次レポート作成エラー', 
+               '月次レポートの作成中にエラーが発生しました。\n詳細はログを確認してください。', 
+               ui.ButtonSet.OK);
+    }
+  } catch (error) {
+    console.error('月次レポート作成実行エラー: ' + error.toString());
+    logDetailedError("runMonthlyReportManually", error);
+    
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('エラー', 
+             '処理中に予期しないエラーが発生しました: ' + error.toString(), 
+             ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 詳細なエラーログを記録する関数
+ * @param {string} location - エラーが発生した場所
+ * @param {Error|string} error - エラーオブジェクトまたはエラーメッセージ
+ * @param {Object} context - エラーに関連する追加情報
+ */
+function logDetailedError(location, error, context = {}) {
+  try {
+    // エラー詳細の抽出
+    const errorDetails = {
+      location: location,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : "スタックトレースなし",
+      timestamp: new Date().toISOString(),
+      context: JSON.stringify(context)
+    };
+    
+    // コンソールへログ出力
+    console.error(`[${errorDetails.location}] ${errorDetails.message}`);
+    console.error(`Stack: ${errorDetails.stack}`);
+    console.error(`Context: ${errorDetails.context}`);
+    
+    // スプレッドシートのエラーログシートに記録
+    try {
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      let errorSheet = ss.getSheetByName("エラーログ");
+      
+      // エラーログシートがなければ作成
+      if (!errorSheet) {
+        errorSheet = ss.insertSheet("エラーログ");
+        // ヘッダー設定
+        errorSheet.getRange("A1:E1").setValues([["タイムスタンプ", "場所", "メッセージ", "スタック", "コンテキスト"]]);
+        errorSheet.getRange("A1:E1").setFontWeight("bold").setBackground("#f3f3f3");
+        errorSheet.setFrozenRows(1);
+      }
+      
+      // エラー情報をログに追加
+      errorSheet.appendRow([
+        errorDetails.timestamp,
+        errorDetails.location,
+        errorDetails.message,
+        errorDetails.stack,
+        errorDetails.context
+      ]);
+      
+      // 列幅の調整（初回のみ）
+      if (errorSheet.getLastRow() <= 2) {
+        errorSheet.setColumnWidth(1, 180); // タイムスタンプ
+        errorSheet.setColumnWidth(2, 150); // 場所
+        errorSheet.setColumnWidth(3, 300); // メッセージ
+        errorSheet.setColumnWidth(4, 400); // スタック
+        errorSheet.setColumnWidth(5, 200); // コンテキスト
+      }
+    } catch (logError) {
+      // エラーログ記録自体でエラーが発生した場合はコンソールだけに出力
+      console.error("エラーログ記録中にエラー: " + logError.toString());
+    }
+    
+    return errorDetails;
+  } catch (metaError) {
+    // エラー処理中にエラーが発生した場合
+    console.error("エラーログ機能でエラー: " + metaError.toString());
+    return { message: String(error), metaError: String(metaError) };
+  }
+}
+
+// 安全にセル範囲を結合するヘルパー関数
+function safelyMergeRange(sheet, arg1, arg2, arg3, arg4) {
+  try {
+    let range;
+    
+    // 引数の型によって処理を分岐
+    if (typeof arg1 === 'string') {
+      // A1:B2 形式の文字列が渡された場合
+      range = sheet.getRange(arg1);
+    } else if (typeof arg1 === 'number' && typeof arg2 === 'number') {
+      if (typeof arg3 === 'number' && typeof arg4 === 'number') {
+        // 行、列、行数、列数の4つの引数が渡された場合
+        range = sheet.getRange(arg1, arg2, arg3, arg4);
+      } else {
+        // 行、列の2つの引数だけが渡された場合（セル1つ）
+        range = sheet.getRange(arg1, arg2);
+      }
+    } else {
+      throw new Error("無効な引数: safelyMergeRangeには文字列（'A1:B2'形式）または行・列の数値が必要です");
+    }
+    
+    // 範囲を結合
+    return range.merge();
+  } catch (error) {
+    console.error(`セル結合エラー: ${error.toString()}`);
+    
+    // エラーの詳細をログに記録
+    try {
+      const rangeStr = typeof arg1 === 'string' ? arg1 : 
+        (typeof arg3 === 'number' && typeof arg4 === 'number') ? 
+        `(${arg1},${arg2},${arg3},${arg4})` : `(${arg1},${arg2})`;
+        
+      logDetailedError("safelyMergeRange", error, {range: rangeStr});
+    } catch (e) {
+      console.error("ログ記録中にエラー: " + e.toString());
+    }
+    
+    // エラーが発生した場合は、結合せずに範囲を返す
+    try {
+      if (typeof arg1 === 'string') {
+        return sheet.getRange(arg1);
+      } else if (typeof arg1 === 'number' && typeof arg2 === 'number') {
+        if (typeof arg3 === 'number' && typeof arg4 === 'number') {
+          return sheet.getRange(arg1, arg2, arg3, arg4);
+        } else {
+          return sheet.getRange(arg1, arg2);
+        }
+      }
+    } catch (e) {
+      console.error("範囲取得中にエラー: " + e.toString());
+      // 最終的な回避策：空のレンジを返す
+      return {
+        setBackground: function() { return this; },
+        setFontWeight: function() { return this; },
+        setValue: function() { return this; }
+      };
+    }
+  }
+}
+
+/**
+ * ステータス行を表示する関数
+ * @param {Sheet} sheet - 表示するシート
+ * @param {number} rowIndex - 表示する行番号
+ * @param {string} status - ステータス名
+ * @param {Object} statusData - ステータスデータ
+ * @param {Date} lastUpdate - 最新更新日
+ */
+function displayStatusRow(sheet, rowIndex, status, statusData, lastUpdate) {
+  try {
+    // ステータス名
+    sheet.getRange(rowIndex, 6).setValue(status);
+    
+    // 件数
+    sheet.getRange(rowIndex, 7).setValue(statusData.count);
+    
+    // カテゴリ別内訳
+    if (statusData.categories) {
+      const topCategories = Object.entries(statusData.categories)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([cat, count]) => `${cat}: ${count}`)
+        .join(", ");
+      
+      sheet.getRange(rowIndex, 8).setValue(topCategories);
+    }
+    
+    // 最近の更新
+    if (lastUpdate) {
+      const formattedDate = Utilities.formatDate(lastUpdate, "JST", "yyyy/MM/dd HH:mm");
+      sheet.getRange(rowIndex, 9).setValue(formattedDate);
+    } else {
+      sheet.getRange(rowIndex, 9).setValue("なし");
+    }
+    
+    // ステータスに応じた背景色設定
+    if (status === "未対応") {
+      sheet.getRange(rowIndex, 6).setBackground("#FFCCCC");
+    } else if (status === "対応中") {
+      sheet.getRange(rowIndex, 6).setBackground("#FFFFCC");
+    } else if (status === "成約") {
+      sheet.getRange(rowIndex, 6).setBackground("#CCFFCC");
+    }
+  } catch (error) {
+    console.error(`ステータス行表示エラー(${status}): ${error.toString()}`);
+    logDetailedError("displayStatusRow", error, {status: status, rowIndex: rowIndex});
+  }
+}
