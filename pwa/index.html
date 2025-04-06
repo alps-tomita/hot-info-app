@@ -252,37 +252,48 @@
   
   <script src="app.js"></script>
   <script>
-    // キャッシュクリアのためのバージョン管理
-    const appVersion = '1.0.5';
-    
-    // Service Worker登録
+    // Service Workerとキャッシュの強制クリア
     if ('serviceWorker' in navigator) {
-      // 新しいバージョンならすべてのService Workerを登録解除
-      if (localStorage.getItem('appVersion') !== appVersion) {
-        console.log('新しいバージョンを検出: ' + appVersion);
-        
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-            registration.unregister();
-            console.log('Service Worker登録解除: ', registration);
-          }
-        }).then(function() {
-          // バージョン情報を保存
-          localStorage.setItem('appVersion', appVersion);
-          console.log('新バージョン情報を保存');
-          
-          // Service Worker登録
-          navigator.serviceWorker.register('service-worker.js')
-            .then(reg => console.log('Service Worker登録成功:', reg))
-            .catch(err => console.error('Service Worker登録失敗:', err));
-        });
-      } else {
-        // 同じバージョンなら通常登録
+      // まず登録されているすべてのService Workerを登録解除
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          registration.unregister();
+          console.log('Service Worker登録解除: ', registration);
+        }
+      }).catch(function(error) {
+        console.error('Service Worker登録解除エラー:', error);
+      });
+    }
+    
+    // キャッシュの強制クリア
+    if ('caches' in window) {
+      caches.keys().then(function(cacheNames) {
+        return Promise.all(
+          cacheNames.map(function(cacheName) {
+            console.log('キャッシュ削除:', cacheName);
+            return caches.delete(cacheName);
+          })
+        );
+      }).catch(function(error) {
+        console.error('キャッシュクリアエラー:', error);
+      });
+    }
+    
+    // localStorageをクリア
+    window.localStorage.clear();
+    console.log('localStorage クリア完了');
+    
+    // アプリバージョン設定（元のバージョンに戻す）
+    const appVersion = '1.0.0';
+    
+    // 2秒後に新規にService Workerを登録（キャッシュクリア処理完了を待つ）
+    setTimeout(function() {
+      if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('service-worker.js')
           .then(reg => console.log('Service Worker登録成功:', reg))
           .catch(err => console.error('Service Worker登録失敗:', err));
       }
-    }
+    }, 2000);
   </script>
 </body>
 </html> 

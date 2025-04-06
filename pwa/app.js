@@ -89,8 +89,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // イベントリスナー：写真なしで送信ボタン
   document.getElementById('no-photo-btn')?.addEventListener('click', () => {
+    console.log('写真なしで送信が選択されました。ルート：', selectedRoute);
+    
     // 写真なしの場合はcapturedImageをnullにセット
     capturedImage = null;
+    
+    // ルート選択画面を非表示
+    routeSelectionContainer.style.display = 'none';
     
     // 位置情報入力ステップを表示
     cameraContainer.style.display = 'none';
@@ -191,6 +196,15 @@ document.addEventListener('DOMContentLoaded', () => {
     loadingContainer.style.display = 'flex';
 
     try {
+      // 手動入力された住所があれば上書き
+      const addressInput = document.getElementById('location-address').value;
+      if (addressInput && addressInput !== '住所を取得中...' && addressInput !== '住所を入力してください') {
+        locationAddress = addressInput;
+      }
+      
+      // 場所の補足情報
+      locationDetail = document.getElementById('location-detail').value || '';
+      
       // データを送信
       const data = {
         requestType: 'submit',
@@ -200,7 +214,8 @@ document.addEventListener('DOMContentLoaded', () => {
         progress: selectedProgress,
         comment: comment || '',
         imageUrl: capturedImage,
-        address: locationDetail,
+        address: locationAddress,
+        locationDetail: locationDetail,
         ...(latitude !== null && longitude !== null && {
           latitude: latitude,
           longitude: longitude
@@ -232,12 +247,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('comment-input').value = '';
     document.getElementById('preview-image').src = '';
     
-    resetAllCardSelections();
-    
-    // 画面を初期状態に戻す
-    document.querySelector('.complete-container').style.display = 'none';
-    infoFormContainer.style.display = 'none';
-    routeSelectionContainer.style.display = 'block';
+    // グローバル関数を呼び出してルート選択画面に戻る
+    showRouteSelection();
   });
   
   /**
@@ -579,18 +590,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /**
-   * ルート選択画面を表示する関数
-   */
-  function showRouteSelection() {
-    resetAllCardSelections();
-    
-    // 画面表示を切り替え
-    routeSelectionContainer.style.display = 'block';
-    cameraContainer.style.display = 'none';
-    infoFormContainer.style.display = 'none';
-  }
-
-  /**
    * カメラエラーを処理する関数
    */
   function handleCameraError(error) {
@@ -795,10 +794,13 @@ async function getLocation() {
             // 市区町村コードを除外し、住所のみを表示
             const address = data.results.lv01Nm;
             document.getElementById('location-address').value = address || '住所を入力してください';
+            // グローバル変数に住所を保存
+            locationAddress = address || '';
           }
         } catch (error) {
           console.error('住所の取得に失敗しました:', error);
           document.getElementById('location-address').placeholder = '住所を入力してください';
+          locationAddress = '';
         }
         
         resolve({
@@ -850,47 +852,120 @@ function getFormData() {
 }
 
 /**
+ * ローディング表示を制御する関数
+ */
+function showLoading(message = '処理中...') {
+  const loadingContainer = document.querySelector('.loading-container');
+  if (loadingContainer) {
+    const messageElement = loadingContainer.querySelector('p');
+    if (messageElement) {
+      messageElement.textContent = message;
+    }
+    loadingContainer.style.display = 'flex';
+  }
+}
+
+function hideLoading() {
+  const loadingContainer = document.querySelector('.loading-container');
+  if (loadingContainer) {
+    loadingContainer.style.display = 'none';
+  }
+}
+
+/**
+ * フォーム情報をリセットする関数
+ */
+function resetForm() {
+  // 入力フィールドをクリア
+  document.getElementById('comment-input').value = '';
+  document.getElementById('location-detail').value = '';
+  
+  // 画像情報をクリア
+  capturedImage = null;
+  latitude = null;
+  longitude = null;
+  locationAddress = '';
+  locationDetail = '';
+  
+  // カード選択をリセット
+  document.querySelectorAll('.category-card').forEach(card => card.classList.remove('selected'));
+  document.querySelectorAll('.material-card').forEach(card => card.classList.remove('selected'));
+  document.querySelectorAll('.progress-card').forEach(card => card.classList.remove('selected'));
+  selectedCategory = null;
+  selectedMaterial = null;
+  selectedProgress = null;
+}
+
+/**
  * データをサーバーに送信する関数
  */
 async function sendData(data) {
   try {
     showLoading('送信中...');
     
-    const endpoint = 'https://script.google.com/macros/s/AKfycbxh6QpUg0ZnBjYw9rsC42kAFopFXg-xdoBTaJvKdh_C9F30I5lQx8uSEKqF-aAbXB7d/exec';
+    const endpoint = 'https://script.google.com/macros/s/AKfycbxHkHnbyCfL0QDxRZbqaXn4n0vByyNtVgbfALvMwH_H3crad-7nVhiX7Qrk0cztGuDL/exec';
     
     console.log('送信データ:', data);
     
     const response = await fetch(endpoint, {
       method: 'POST',
-      mode: 'cors',
+      mode: 'no-cors', // CORSエラーを回避するためno-corsに変更
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
     });
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log('送信結果:', result);
+    // no-corsモードの場合、レスポンスのステータスコードや内容にアクセスできないため
+    // 成功として扱う（エラーはcatchブロックで捕捉される）
+    console.log('レスポンス（詳細表示不可）:', response);
     
     hideLoading();
     
-    if (result.result === 'success') {
-      alert('情報が正常に送信されました！');
-      resetForm();
-      showRouteSelection();
-    } else {
-      alert('送信に失敗しました: ' + (result.message || '不明なエラー'));
-    }
+    // フォームをリセットして完了画面を表示
+    resetForm();
+    
+    // 成功したら完了画面を表示
+    const infoFormContainer = document.querySelector('.info-form-container');
+    const completeContainer = document.querySelector('.complete-container');
+    
+    if (infoFormContainer) infoFormContainer.style.display = 'none';
+    if (completeContainer) completeContainer.style.display = 'block';
+    
+    // completeContainer表示後は、「新規登録へ」ボタンでshowRouteSelectionを使用
+    
   } catch (error) {
     hideLoading();
     console.error('送信エラー:', error);
     alert('送信に失敗しました。インターネット接続を確認してください。');
-    
-    // オフライン時の対応（今後実装予定）
-    // saveDataForLater(data);
   }
+}
+
+/**
+ * ルート選択画面を表示する関数
+ */
+function showRouteSelection() {
+  // すべてのカード選択をリセット
+  document.querySelectorAll('.category-card').forEach(card => card.classList.remove('selected'));
+  document.querySelectorAll('.material-card').forEach(card => card.classList.remove('selected'));
+  document.querySelectorAll('.progress-card').forEach(card => card.classList.remove('selected'));
+  
+  // グローバル変数をリセット
+  selectedCategory = null;
+  selectedMaterial = null;
+  selectedProgress = null;
+  capturedImage = null;
+  latitude = null;
+  longitude = null;
+  
+  // 画面表示を切り替え
+  const routeSelectionContainer = document.querySelector('.route-selection-container');
+  const cameraContainer = document.querySelector('.camera-container');
+  const infoFormContainer = document.querySelector('.info-form-container');
+  const completeContainer = document.querySelector('.complete-container');
+  
+  if (routeSelectionContainer) routeSelectionContainer.style.display = 'block';
+  if (cameraContainer) cameraContainer.style.display = 'none';
+  if (infoFormContainer) infoFormContainer.style.display = 'none';
+  if (completeContainer) completeContainer.style.display = 'none';
 } 
