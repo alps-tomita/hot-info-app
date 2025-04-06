@@ -4,11 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="description" content="飲食店営業情報を簡単に送信するためのPWAアプリ">
-  <meta name="theme-color" content="#4285f4">
+  <meta name="theme-color" content="#3498db">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="HOT情報">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <link rel="apple-touch-icon" href="images/icon-192x192.png">
   <link rel="manifest" href="manifest.json">
   <title>HOT情報送信アプリ</title>
@@ -44,6 +45,11 @@
             <span class="icon">📷</span>
             写真を撮影して送信
           </button>
+          <button id="select-photo-btn" class="primary-btn">
+            <span class="icon">🖼️</span>
+            写真を選択して送信
+          </button>
+          <input type="file" id="photo-file-input" accept="image/*" style="display: none;">
           <button id="no-photo-btn" class="secondary-btn">
             <span class="icon">✏️</span>
             写真なしで送信
@@ -241,7 +247,10 @@
         <div class="complete-icon">✓</div>
         <h2>送信完了</h2>
         <p>情報が正常に送信されました</p>
-        <button id="new-report-btn" class="primary-btn">新規登録へ</button>
+        <div class="complete-buttons">
+          <button id="new-report-btn" class="primary-btn">新規登録へ</button>
+          <button id="close-app-btn" class="secondary-btn">アプリを終了</button>
+        </div>
       </div>
     </main>
     

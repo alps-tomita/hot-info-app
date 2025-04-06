@@ -64,6 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // 要素の取得
   const routeButtonsContainer = document.querySelector('.route-buttons-container');
   const startCameraBtn = document.getElementById('start-camera-btn');
+  const selectPhotoBtn = document.getElementById('select-photo-btn');
+  const photoFileInput = document.getElementById('photo-file-input');
   const cameraContainer = document.querySelector('.camera-container');
   const cameraButtonContainer = document.querySelector('.camera-btn-container');
   const infoFormContainer = document.querySelector('.info-form-container');
@@ -87,6 +89,85 @@ document.addEventListener('DOMContentLoaded', () => {
     startCamera();
   });
 
+  // イベントリスナー：写真選択ボタン
+  selectPhotoBtn.addEventListener('click', () => {
+    console.log('写真選択ボタンがクリックされました。ルート：', selectedRoute);
+    // ファイル選択ダイアログを表示
+    photoFileInput.click();
+  });
+
+  // ファイル選択時のイベントリスナー
+  photoFileInput.addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) {
+      console.log('ファイルが選択されませんでした');
+      return;
+    }
+
+    console.log('ファイルが選択されました:', file.name);
+    
+    try {
+      // FileReaderを使って画像ファイルをBase64形式に変換
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        capturedImage = e.target.result; // Base64形式の画像データ
+        console.log('画像ファイルを読み込みました', capturedImage.substring(0, 50) + '...');
+        
+        // ルート選択画面を非表示にして情報入力フォームを表示
+        routeSelectionContainer.style.display = 'none';
+        infoFormContainer.style.display = 'block';
+        showLocationStep();
+        
+        // 位置情報の取得を試みる
+        try {
+          // EXIF情報から位置情報を取得
+          const exifLocation = await getExifLocationFromFile(file);
+          
+          if (exifLocation) {
+            console.log('ファイルからEXIF位置情報を取得:', exifLocation);
+            latitude = exifLocation.latitude;
+            longitude = exifLocation.longitude;
+            document.getElementById('location-coords').textContent = 
+              `緯度: ${latitude.toFixed(6)}, 経度: ${longitude.toFixed(6)}`;
+            
+            // 住所を取得する処理を追加
+            try {
+              await fetchAddressFromCoordinates(latitude, longitude);
+            } catch (addrError) {
+              console.error('住所の取得に失敗:', addrError);
+            }
+          } else {
+            console.log('ファイルにEXIF位置情報がありませんでした');
+            document.getElementById('location-coords').textContent = '位置情報を取得できませんでした';
+            document.getElementById('location-address').placeholder = '住所を入力してください';
+            // 位置情報が取得できない場合はnullを設定
+            latitude = null;
+            longitude = null;
+          }
+        } catch (error) {
+          console.error('EXIF情報の取得に失敗しました:', error);
+          document.getElementById('location-coords').textContent = '位置情報を取得できませんでした';
+          document.getElementById('location-address').placeholder = '住所を入力してください';
+          latitude = null;
+          longitude = null;
+        }
+      };
+      
+      reader.onerror = (error) => {
+        console.error('ファイル読み込みエラー:', error);
+        alert('ファイルの読み込みに失敗しました');
+      };
+      
+      // ファイルをBase64形式で読み込む
+      reader.readAsDataURL(file);
+      
+    } catch (error) {
+      console.error('写真選択処理エラー:', error);
+      alert('写真の処理に失敗しました: ' + error.message);
+    }
+  });
+
   // イベントリスナー：写真なしで送信ボタン
   document.getElementById('no-photo-btn')?.addEventListener('click', () => {
     console.log('写真なしで送信が選択されました。ルート：', selectedRoute);
@@ -94,12 +175,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // 写真なしの場合はcapturedImageをnullにセット
     capturedImage = null;
     
+    // 位置情報もnullに設定
+    latitude = null;
+    longitude = null;
+    
     // ルート選択画面を非表示
     routeSelectionContainer.style.display = 'none';
     
     // 位置情報入力ステップを表示
     cameraContainer.style.display = 'none';
     infoFormContainer.style.display = 'block';
+    
+    // 位置情報の入力フィールドを初期化
+    document.getElementById('location-coords').textContent = '位置情報なし（手動入力可）';
+    document.getElementById('location-address').value = '';
+    document.getElementById('location-address').placeholder = '住所を入力してください';
+    
     showLocationStep();
   });
 
@@ -249,6 +340,20 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // グローバル関数を呼び出してルート選択画面に戻る
     showRouteSelection();
+  });
+  
+  // アプリ終了ボタンのイベントリスナー
+  document.getElementById('close-app-btn')?.addEventListener('click', () => {
+    // インストール済みのPWAの場合はウィンドウを閉じる
+    // (一部のモバイルブラウザでは動作しない場合があります)
+    if (window.matchMedia('(display-mode: standalone)').matches || 
+        window.navigator.standalone === true) {
+      // PWAとして実行中の場合
+      window.close();
+    } else {
+      // 通常のブラウザの場合
+      alert('ブラウザを閉じてアプリを終了してください。');
+    }
   });
   
   /**
@@ -452,17 +557,40 @@ document.addEventListener('DOMContentLoaded', () => {
           longitude = exifLocation.longitude;
           document.getElementById('location-coords').textContent = 
             `緯度: ${latitude.toFixed(6)}, 経度: ${longitude.toFixed(6)}`;
+          
+          // 住所を取得
+          try {
+            await fetchAddressFromCoordinates(latitude, longitude);
+          } catch (addrError) {
+            console.error('住所の取得に失敗:', addrError);
+          }
           return;
         }
 
-        // EXIF情報が取得できない場合はデバイスの位置情報を取得
-        const location = await getLocation();
-        if (location) {
-          latitude = location.latitude;
-          longitude = location.longitude;
+        // EXIF情報が取得できない場合、撮影時に取得した位置情報を使用
+        if (window._tempPhotoLocation) {
+          console.log('EXIF情報なし - 撮影時に保存した位置情報を使用');
+          latitude = window._tempPhotoLocation.latitude;
+          longitude = window._tempPhotoLocation.longitude;
           document.getElementById('location-coords').textContent = 
             `緯度: ${latitude.toFixed(6)}, 経度: ${longitude.toFixed(6)}`;
+          
+          // 住所を取得
+          try {
+            await fetchAddressFromCoordinates(latitude, longitude);
+          } catch (addrError) {
+            console.error('住所の取得に失敗:', addrError);
+          }
+          return;
         }
+
+        // どちらの方法でも位置情報が取得できない場合
+        console.log('写真からの位置情報取得できず、現在地からの取得もスキップします');
+        document.getElementById('location-coords').textContent = '位置情報を取得できませんでした';
+        document.getElementById('location-address').placeholder = '住所を入力してください';
+        // 位置情報が取得できない場合はnullを設定
+        latitude = null;
+        longitude = null;
       } catch (error) {
         console.error('位置情報の取得に失敗しました:', error);
         document.getElementById('location-coords').textContent = '位置情報を取得できませんでした';
@@ -479,6 +607,31 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   async function capturePhoto() {
     try {
+      // 位置情報を先に取得しておく（モバイル端末用）
+      try {
+        // PWAで位置情報許可を得るタイミングの改善
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              console.log('撮影時に位置情報を取得: 成功');
+              // 位置情報を一時的に保存（EXIF取得に失敗した場合のバックアップ）
+              window._tempPhotoLocation = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+              };
+            },
+            (error) => {
+              console.log('撮影時の位置情報取得: 失敗', error.message);
+              window._tempPhotoLocation = null;
+            },
+            { enableHighAccuracy: true, timeout: 5000 }
+          );
+        }
+      } catch (geoError) {
+        console.log('位置情報の事前取得に失敗:', geoError);
+      }
+
+      // キャンバスサイズをビデオに合わせる
       canvasElement.width = videoElement.videoWidth;
       canvasElement.height = videoElement.videoHeight;
       
@@ -513,6 +666,14 @@ document.addEventListener('DOMContentLoaded', () => {
   function getExifLocation() {
     return new Promise((resolve, reject) => {
       try {
+        // デバッグ: Base64画像データの確認
+        console.log('EXIF取得開始: 画像データあり=', !!capturedImage);
+        if (!capturedImage) {
+          console.log('画像データがありません');
+          resolve(null);
+          return;
+        }
+        
         // Base64画像データをBlobに変換
         const base64Data = capturedImage.split(',')[1];
         const binary = atob(base64Data);
@@ -524,12 +685,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // BlobからFileオブジェクトを作成
         const file = new File([blob], "photo.jpg", { type: 'image/jpeg' });
+        console.log('EXIF取得: Fileオブジェクト作成完了', file.size, 'bytes');
 
         EXIF.getData(file, function() {
           const exifData = EXIF.getAllTags(this);
-          console.log('EXIF情報:', exifData);
+          console.log('EXIF情報取得結果:', exifData);
 
           if (exifData && exifData.GPSLatitude && exifData.GPSLongitude) {
+            console.log('EXIF位置情報検出:', exifData.GPSLatitude, exifData.GPSLongitude);
             // EXIF座標を10進数に変換
             const latitude = convertDMSToDD(
               exifData.GPSLatitude[0],
@@ -544,13 +707,15 @@ document.addEventListener('DOMContentLoaded', () => {
               exifData.GPSLongitudeRef
             );
 
+            console.log('位置情報変換完了:', latitude, longitude);
             resolve({ latitude, longitude });
           } else {
+            console.log('EXIF内に位置情報が見つかりませんでした');
             resolve(null);
           }
         });
       } catch (error) {
-        console.error('EXIF情報の取得に失敗:', error);
+        console.error('EXIF情報の取得エラー:', error);
         resolve(null);
       }
     });
@@ -759,6 +924,48 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 300);
     });
   });
+
+  /**
+   * ファイルから直接EXIF情報を取得する関数
+   */
+  function getExifLocationFromFile(file) {
+    return new Promise((resolve, reject) => {
+      try {
+        console.log('ファイルからEXIF情報取得開始:', file.name);
+        
+        EXIF.getData(file, function() {
+          const exifData = EXIF.getAllTags(this);
+          console.log('EXIF情報取得結果:', exifData);
+
+          if (exifData && exifData.GPSLatitude && exifData.GPSLongitude) {
+            console.log('EXIF位置情報検出:', exifData.GPSLatitude, exifData.GPSLongitude);
+            // EXIF座標を10進数に変換
+            const latitude = convertDMSToDD(
+              exifData.GPSLatitude[0],
+              exifData.GPSLatitude[1],
+              exifData.GPSLatitude[2],
+              exifData.GPSLatitudeRef
+            );
+            const longitude = convertDMSToDD(
+              exifData.GPSLongitude[0],
+              exifData.GPSLongitude[1],
+              exifData.GPSLongitude[2],
+              exifData.GPSLongitudeRef
+            );
+
+            console.log('位置情報変換完了:', latitude, longitude);
+            resolve({ latitude, longitude });
+          } else {
+            console.log('EXIF内に位置情報が見つかりませんでした');
+            resolve(null);
+          }
+        });
+      } catch (error) {
+        console.error('EXIF情報の取得エラー:', error);
+        resolve(null);
+      }
+    });
+  }
 });
 
 /**
@@ -821,6 +1028,33 @@ async function getLocation() {
       }
     );
   });
+}
+
+/**
+ * 座標から住所を取得する関数
+ */
+async function fetchAddressFromCoordinates(lat, lon) {
+  try {
+    const response = await fetch(
+      `https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${lat}&lon=${lon}`
+    );
+    const data = await response.json();
+    
+    if (data.results) {
+      // 市区町村コードを除外し、住所のみを表示
+      const address = data.results.lv01Nm;
+      document.getElementById('location-address').value = address || '住所を入力してください';
+      // グローバル変数に住所を保存
+      locationAddress = address || '';
+      return address;
+    }
+    return null;
+  } catch (error) {
+    console.error('住所の取得に失敗しました:', error);
+    document.getElementById('location-address').placeholder = '住所を入力してください';
+    locationAddress = '';
+    return null;
+  }
 }
 
 // 送信するフォームデータを取得する関数
