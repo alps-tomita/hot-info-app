@@ -85,6 +85,18 @@ document.addEventListener('DOMContentLoaded', () => {
   // イベントリスナー：カメラ起動ボタン
   startCameraBtn.addEventListener('click', () => {
     console.log('カメラ起動ボタンがクリックされました。ルート：', selectedRoute);
+    // 位置情報をリセット
+    latitude = null;
+    longitude = null;
+    locationAddress = '';
+    // フォームフィールドも初期化
+    if (document.getElementById('location-coords')) {
+      document.getElementById('location-coords').textContent = '';
+    }
+    if (document.getElementById('location-address')) {
+      document.getElementById('location-address').value = '';
+      document.getElementById('location-address').placeholder = '住所を取得中...';
+    }
     resetAllCardSelections();
     startCamera();
   });
@@ -92,6 +104,18 @@ document.addEventListener('DOMContentLoaded', () => {
   // イベントリスナー：写真選択ボタン
   selectPhotoBtn.addEventListener('click', () => {
     console.log('写真選択ボタンがクリックされました。ルート：', selectedRoute);
+    // 位置情報をリセット
+    latitude = null;
+    longitude = null;
+    locationAddress = '';
+    // フォームフィールドも初期化
+    if (document.getElementById('location-coords')) {
+      document.getElementById('location-coords').textContent = '';
+    }
+    if (document.getElementById('location-address')) {
+      document.getElementById('location-address').value = '';
+      document.getElementById('location-address').placeholder = '住所を取得中...';
+    }
     // ファイル選択ダイアログを表示
     photoFileInput.click();
   });
@@ -196,6 +220,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 画面制御関数を更新
   function showLocationStep() {
+    // 位置情報フィールドの状態をチェック・リセット
+    // 新しい送信を始める時に前回の値が残らないようにする
+    if (!capturedImage) {
+      // 写真なしの場合や新規セッションの場合はフィールドをクリア
+      if (document.getElementById('location-coords')) {
+        document.getElementById('location-coords').textContent = '位置情報なし（手動入力可）';
+      }
+      if (document.getElementById('location-address')) {
+        document.getElementById('location-address').value = '';
+        document.getElementById('location-address').placeholder = '住所を入力してください';
+      }
+    }
+
     document.getElementById('location-step').style.display = 'block';
     document.getElementById('category-step').style.display = 'none';
     document.getElementById('material-step').style.display = 'none';
@@ -1191,6 +1228,19 @@ function showRouteSelection() {
   capturedImage = null;
   latitude = null;
   longitude = null;
+  locationAddress = '';
+  
+  // 位置情報入力フィールドを確実にリセット
+  if (document.getElementById('location-coords')) {
+    document.getElementById('location-coords').textContent = '';
+  }
+  if (document.getElementById('location-address')) {
+    document.getElementById('location-address').value = '';
+    document.getElementById('location-address').placeholder = '住所を入力してください';
+  }
+  if (document.getElementById('location-detail')) {
+    document.getElementById('location-detail').value = '';
+  }
   
   // 画面表示を切り替え
   const routeSelectionContainer = document.querySelector('.route-selection-container');
@@ -1198,6 +1248,7 @@ function showRouteSelection() {
   const infoFormContainer = document.querySelector('.info-form-container');
   const completeContainer = document.querySelector('.complete-container');
   
+  // 各コンテナの表示状態を設定
   if (routeSelectionContainer) routeSelectionContainer.style.display = 'block';
   if (cameraContainer) cameraContainer.style.display = 'none';
   if (infoFormContainer) infoFormContainer.style.display = 'none';
