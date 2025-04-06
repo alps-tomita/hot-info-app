@@ -167,6 +167,9 @@ function doPost(e) {
       params.progress || ""  // 工事進捗状況
     ]);
     
+    // データ追加後にタイムスタンプの新しい順にソート
+    sortDataReceiveSheet();
+    
     // Chatworkに新規データ受信を通知
     const locationInfo = params.address || `${params.latitude}, ${params.longitude}`;
     const notificationMessage = `【新規HOT情報受信】\n` +
@@ -463,6 +466,9 @@ function transferDataToManagementSheet() {
     // シートの表示を調整
     if (transferredCount > 0) {
       manageSheet.autoResizeColumns(1, manageSheet.getLastColumn());
+      
+      // 情報管理シートをタイムスタンプの新しい順にソート
+      sortInfoManagementSheet();
     }
     
     return transferredCount;
@@ -892,23 +898,44 @@ function sendChatworkNotification(message) {
 function transferDataAndNotify() {
   try {
     // データ転記を実行
-    const transferCount = transferDataToManagementSheet();
+    const transferredCount = transferDataToManagementSheet();
     
-    // 転記結果に基づいて通知メッセージを作成
-    if (transferCount > 0) {
-      const message = `【HOT情報転記完了】\n` +
-        `${transferCount}件の新規データを「情報管理」シートに転記しました。\n` +
-        `日時: ${new Date().toLocaleString("ja-JP")}\n\n` +
-        `確認はこちら: ${SpreadsheetApp.openById(SPREADSHEET_ID).getUrl()}`;
+    // 必要に応じて通知を送信
+    if (transferredCount > 0) {
+      // スプレッドシートのURLを取得
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheetUrl = ss.getUrl();
+      
+      // 通知メッセージを作成
+      const message = `【HOT情報管理】データ転送完了\n` +
+        `${transferredCount}件のデータを情報管理シートに転記しました。\n` +
+        `確認はこちら: ${sheetUrl}`;
       
       // Chatworkに通知
       sendChatworkNotification(message);
+      
+      // ユーザーインターフェイスにも通知
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        `${transferredCount}件のデータを転記し、情報管理シートを最新順にソートしました。`,
+        'データ転送完了',
+        5
+      );
+    } else {
+      // 転送するデータがなかった場合
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        '転記する新規データがありませんでした。',
+        '処理完了',
+        3
+      );
     }
     
-    return transferCount;
   } catch (error) {
-    console.error("転記＆通知エラー: " + error.toString());
-    return 0;
+    console.error("データ転送通知処理エラー: " + error.toString());
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      `エラーが発生しました: ${error.message}`,
+      'エラー',
+      10
+    );
   }
 }
 
@@ -921,6 +948,8 @@ function onOpen() {
     
     // カスタムメニュー作成（シンプル化）
     ui.createMenu('HOT情報管理')
+      .addItem('情報管理シートを最新順にソート', 'sortInfoManagementSheet')
+      .addItem('データ受信用シートを最新順にソート', 'sortDataReceiveSheet')
       .addItem('ダッシュボードを更新', 'updateDashboardTrigger')
       .addItem('月次データを作成', 'createMonthlyReport')
       .addSeparator()
@@ -2471,5 +2500,79 @@ function displayStatusRow(sheet, rowIndex, status, statusData, lastUpdate) {
   } catch (error) {
     console.error(`ステータス行表示エラー(${status}): ${error.toString()}`);
     logDetailedError("displayStatusRow", error, {status: status, rowIndex: rowIndex});
+  }
+}
+
+/**
+ * データ受信用シートをタイムスタンプの新しい順にソートする関数
+ */
+function sortDataReceiveSheet() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const dataSheet = ss.getSheetByName("データ受信用");
+    
+    // データの範囲を取得
+    const dataRange = dataSheet.getDataRange();
+    const lastRow = dataRange.getLastRow();
+    const lastColumn = dataRange.getLastColumn();
+    
+    // データが2行未満（ヘッダーのみ）の場合は何もしない
+    if (lastRow <= 1) {
+      console.log('データ受信用シートにソートするデータがありません');
+      SpreadsheetApp.getActiveSpreadsheet().toast('ソートするデータがありません', '処理完了', 3);
+      return;
+    }
+    
+    // ソート範囲を設定（ヘッダー行を除く）
+    const rangeToSort = dataSheet.getRange(2, 1, lastRow - 1, lastColumn);
+    
+    // タイムスタンプ列（1列目）で降順にソート
+    rangeToSort.sort({column: 1, ascending: false});
+    
+    console.log('データ受信用シートをタイムスタンプの新しい順にソートしました');
+    
+    // 成功メッセージを表示
+    SpreadsheetApp.getActiveSpreadsheet().toast('データ受信用シートを最新順にソートしました', 'ソート完了', 5);
+  } catch (error) {
+    console.error('データ受信用シートのソート中にエラーが発生しました:', error);
+    logDetailedError('sortDataReceiveSheet', error);
+    
+    // エラーメッセージを表示
+    SpreadsheetApp.getActiveSpreadsheet().toast('ソート中にエラーが発生しました: ' + error.message, 'エラー', 10);
+  }
+}
+
+/**
+ * 情報管理シートをタイムスタンプの新しい順にソートする関数
+ */
+function sortInfoManagementSheet() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const managementSheet = ss.getSheetByName("情報管理");
+    
+    // データの範囲を取得
+    const dataRange = managementSheet.getDataRange();
+    const lastRow = dataRange.getLastRow();
+    const lastColumn = dataRange.getLastColumn();
+    
+    // データが2行未満（ヘッダーのみ）の場合は何もしない
+    if (lastRow <= 1) return;
+    
+    // ソート範囲を設定（ヘッダー行を除く）
+    const rangeToSort = managementSheet.getRange(2, 1, lastRow - 1, lastColumn);
+    
+    // タイムスタンプ列（1列目）で降順にソート
+    rangeToSort.sort({column: 1, ascending: false});
+    
+    console.log('情報管理シートをタイムスタンプの新しい順にソートしました');
+    
+    // 成功メッセージを表示
+    SpreadsheetApp.getActiveSpreadsheet().toast('情報管理シートを最新順にソートしました', 'ソート完了', 5);
+  } catch (error) {
+    console.error('情報管理シートのソート中にエラーが発生しました:', error);
+    logDetailedError('sortInfoManagementSheet', error);
+    
+    // エラーメッセージを表示
+    SpreadsheetApp.getActiveSpreadsheet().toast('ソート中にエラーが発生しました: ' + error.message, 'エラー', 10);
   }
 }
