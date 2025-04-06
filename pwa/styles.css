@@ -174,23 +174,56 @@ button {
 .camera-btn-container {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 20px;
+  gap: 16px;
+  margin-top: 24px;
   width: 100%;
-  max-width: 400px;
+  max-width: 500px;
+  padding: 0 16px;
 }
 
 .camera-btn-container button {
-  padding: 15px;
-  font-size: 16px;
+  padding: 16px;
+  font-size: 17px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.camera-btn-container button:active {
+  transform: scale(0.98);
+}
+
+.camera-btn-container .primary-btn {
+  background: #4285f4;
+  border: none;
+  margin-bottom: 12px;
+  color: white;
+}
+
+.camera-btn-container .primary-btn:hover {
+  background: #3367d6;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.camera-btn-container .secondary-btn {
+  background: #ffffff;
+  border: 2px solid #dadce0;
+  color: #3c4043;
+}
+
+.camera-btn-container .secondary-btn:hover {
+  background: #f8f9fa;
+  border-color: #4285f4;
+  color: #4285f4;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .camera-btn-container .icon {
-  margin-right: 10px;
-  font-size: 20px;
+  margin-right: 12px;
+  font-size: 22px;
 }
 
 /* ボタンをグループに整理するためのスタイルを追加 */
@@ -760,4 +793,40 @@ footer {
   border-color: var(--primary-color);
   outline: none;
   box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+}
+
+/* アクションオプションコンテナ */
+.action-options {
+  background: transparent;
+  padding: 16px;
+  margin: 16px auto;
+  max-width: 500px;
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+  .action-options {
+    background: transparent;
+  }
+  
+  .camera-btn-container .primary-btn {
+    background: #0088ff;
+    text-shadow: none;
+  }
+  
+  .camera-btn-container .primary-btn:hover {
+    background: #00a0ff;
+  }
+  
+  .camera-btn-container .secondary-btn {
+    background: #ffffff;
+    border: 2px solid #dadce0;
+    color: #3c4043;
+  }
+  
+  .camera-btn-container .secondary-btn:hover {
+    background: #f8f8f8;
+    border-color: #0088ff;
+    color: #0088ff;
+  }
 } 
